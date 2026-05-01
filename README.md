@@ -53,13 +53,13 @@ Both are configurable in Settings.
 
 ## Whisper Models
 
-| Model | Size | Speed |
-|---|---|---|
-| tiny | ~75 MB | Fastest |
-| base | ~142 MB | Fast (recommended) |
-| small | ~466 MB | Moderate |
-| medium | ~1.5 GB | Slow |
-| large-v3 | ~3 GB | Slowest, most accurate |
+| Model | Size | Speed | RAM & Hardware Notes |
+|---|---|---|---|
+| tiny | ~75 MB | Fastest | ~200MB RAM. Recommended for MacBook Air 8GB RAM. |
+| base | ~142 MB | Fast | ~400MB RAM. Default; snappy on any Apple Silicon Mac. |
+| small | ~466 MB | Moderate | ~1GB RAM. Good balance of speed and accuracy. |
+| medium | ~1.5 GB | Slow | ~2.5GB RAM. 16GB RAM recommended. |
+| large-v3 | ~3 GB | Slowest | ~5GB RAM. Most accurate; 16GB+ RAM. M Pro/Max/Ultra recommended for decent speeds. |
 
 Models are downloaded from Hugging Face and stored in `~/Library/Application Support/Type.OH/models/`.
 
