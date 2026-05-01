@@ -13,8 +13,6 @@ Everything runs **locally and free** by default:
 
 Optionally, bring your own API key for **Anthropic Claude**, **OpenAI**, or **Google Gemini** if you want a heavier cloud model for Style / Fix. Keys are stored in the macOS Keychain. No telemetry. No third parties beyond the provider you choose.
 
-Inspired in spirit by [Careless Whisper](https://github.com/YarivGilad/careless-whisper) (the voice half) and a Telegram bot called *AI Editor* (the text half) — but written from scratch, native, and Apple-Intelligence-first.
-
 > The app has no Dock icon — it lives in the **menu bar** (top-right of your screen).
 
 ---
