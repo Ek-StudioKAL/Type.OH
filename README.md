@@ -1,4 +1,4 @@
-# Type.OH
+# Type.OH / iLazyKey (alternative name)
 
 A native macOS menu-bar app that does two things, both with a single hotkey:
 
