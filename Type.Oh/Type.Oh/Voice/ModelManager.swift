@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import WhisperKit
 
 struct WhisperModelInfo: Identifiable, Sendable {
     let id: String
@@ -37,12 +38,17 @@ final class ModelManager {
     }
 
     func download(_ modelID: String) async throws {
-        // TODO: replace with WhisperKit.download(variant:downloadBase:)
         isDownloading = true
         defer { isDownloading = false; downloadProgress = 0 }
-        for i in 1...10 {
-            try await Task.sleep(for: .milliseconds(200))
-            downloadProgress = Double(i) / 10.0
-        }
+        _ = try await WhisperKit.download(
+            variant: modelID,
+            downloadBase: modelsDirectory,
+            progressCallback: { [weak self] progress in
+                let fraction = progress.fractionCompleted
+                Task { @MainActor [weak self] in
+                    self?.downloadProgress = fraction
+                }
+            }
+        )
     }
 }

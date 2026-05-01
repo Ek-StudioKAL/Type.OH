@@ -1,28 +1,27 @@
 import Foundation
-
-// Stub — add the WhisperKit Swift Package (https://github.com/argmaxinc/WhisperKit),
-// then replace the TODO stubs with the real implementation.
+import WhisperKit
 
 actor WhisperService {
-    // TODO: private var whisperKit: WhisperKit?
+    private var whisperKit: WhisperKit?
 
-    private var loadedModel: String?
+    private var modelsDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Type.OH/models")
+    }
 
     func loadModel(_ name: String) async throws {
-        // TODO: whisperKit = try await WhisperKit(model: name, modelFolder: modelsDirectory.path)
-        loadedModel = name
+        let config = WhisperKitConfig(model: name, modelFolder: modelsDirectory.path)
+        whisperKit = try await WhisperKit(config)
     }
 
     func transcribe(audio: [Float]) async throws -> String {
-        guard loadedModel != nil else { throw WhisperError.modelNotLoaded }
-        // TODO: let results = try await whisperKit!.transcribe(audioArray: audio)
-        //       return results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespaces)
-        return "[WhisperKit not yet integrated — add the SPM package first]"
+        guard let kit = whisperKit else { throw WhisperError.modelNotLoaded }
+        let results = try await kit.transcribe(audioArray: audio)
+        return results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespaces)
     }
 
     enum WhisperError: Error, LocalizedError {
         case modelNotLoaded
-
         var errorDescription: String? { "No Whisper model loaded. Download one in Settings." }
     }
 }

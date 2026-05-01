@@ -27,7 +27,7 @@ struct LanguagePicker: View {
                 if let lang { targetLanguage = lang }
             }
         }
-        .task { supported = LanguageAvailability().supportedLanguages }
+        .task { supported = await LanguageAvailability().supportedLanguages }
     }
 
     // MARK: - Helpers

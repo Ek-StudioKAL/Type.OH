@@ -9,6 +9,6 @@ final class FocusCapture {
     }
 
     func restore() {
-        capturedApp?.activate(options: .activateIgnoringOtherApps)
+        capturedApp?.activate()
     }
 }
