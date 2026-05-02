@@ -9,15 +9,15 @@ struct StylePreset: Identifiable, Sendable {
 
 enum StylePresets {
     static let all: [StylePreset] = [
-        StylePreset(id: "formal",    label: "Formal",    emoji: "🤝",
-            promptFragment: "Rewrite the following text in a formal, professional tone."),
-        StylePreset(id: "concise",   label: "Concise",   emoji: "✂️",
-            promptFragment: "Rewrite the following text to be shorter and more concise, removing all unnecessary words."),
-        StylePreset(id: "friendly",  label: "Friendly",  emoji: "😊",
-            promptFragment: "Rewrite the following text in a warm, friendly, and approachable tone."),
-        StylePreset(id: "corporate", label: "Corporate", emoji: "💼",
-            promptFragment: "Rewrite the following text in a polished corporate business communication style."),
-        StylePreset(id: "pirate",    label: "Pirate",    emoji: "🏴‍☠️",
-            promptFragment: "Rewrite the following text as if it were written by a swashbuckling pirate. Be creative and fun with pirate slang and expressions, matey!"),
+        StylePreset(id: "boomer",    label: "Boomer",    emoji: "📋",
+            promptFragment: "Rewrite the following text in a Baby Boomer communication style: formal, proper grammar, respectful, no slang, gets straight to the point without being curt. The tone should feel like a professional email from someone who values tradition and clear, direct language."),
+        StylePreset(id: "genx",      label: "Gen X",     emoji: "🕶️",
+            promptFragment: "Rewrite the following text in a Gen X style: direct, no-nonsense, slightly dry and sardonic. Skip the corporate fluff and excessive positivity. Speak plainly, as if you've seen it all before and just want to get things done."),
+        StylePreset(id: "millennial", label: "Millennial", emoji: "🥑",
+            promptFragment: "Rewrite the following text in a Millennial communication style: conversational, self-aware, warm, and relatably honest. It can acknowledge feelings and uncertainty. Avoid jargon but allow natural, grounded humor. The tone should feel human and approachable."),
+        StylePreset(id: "genz",      label: "Gen Z",     emoji: "💅",
+            promptFragment: "Rewrite the following text in Gen Z style: casual, punchy, and unfiltered. Keep it short. Use current internet-native phrasing — understated irony, deadpan humor, low effort energy on the surface but sharp underneath. No corporate speak, no boomerspeak, no cringe."),
+        StylePreset(id: "alpha",     label: "Gen Alpha", emoji: "🔥",
+            promptFragment: "Rewrite the following text in Gen Alpha style: ultra-short, high energy, emoji-forward, very online. Think TikTok captions, brainrot humor, rapid-fire tone. Keep it punchy and chaotic in a good way. No long sentences."),
     ]
 }

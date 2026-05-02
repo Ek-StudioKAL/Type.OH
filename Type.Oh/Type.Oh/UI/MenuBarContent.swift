@@ -16,7 +16,11 @@ struct MenuBarContent: View {
             NotificationCenter.default.post(name: NSNotification.Name("typeoh.editorHotkey.sticky"), object: nil)
         }
 
-        Button("Settings…") { openSettings() }
+        Button("Settings…") {
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
+            openSettings()
+        }
 
         Divider()
 

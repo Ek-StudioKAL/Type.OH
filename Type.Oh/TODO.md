@@ -6,104 +6,96 @@ Items are ordered by urgency. Each one names the most likely files to touch and 
 
 ---
 
-## Completed in last session (2026-05-02)
+## Completed (2026-05-02)
 
 - ✅ Menu redesign — About / Dictate / ReTypeOH / Settings / Quit
 - ✅ Dock icon toggle (`SettingsStore.showInDock`, Settings → General)
-- ✅ Window constraint crash — switched all panels to `NSHostingController` + `sizingOptions = .preferredContentSize`; panels are now resizable with `minSize`
-- ✅ Responsive AI Editor panel — `minWidth: 460, idealWidth: 520, maxWidth: 900`
-- ✅ Whisper model auto-reload after download — no restart required (`Notification.Name.whisperModelDownloaded`)
-- ✅ "Re-run Setup Wizard" button added to Settings → General
-- ✅ Unit tests: 20/20 passing (`SettingsStoreTests`, `StylePresetsTests`, `ModelManagerTests`, placeholder `Type_OhTests`) — Xcode target wired and green
-- ✅ `SettingsStore.init(settingsURL:)` test-only initializer added so tests are isolated from user's saved settings
+- ✅ Window constraint crash — `NSHostingController` + `sizingOptions = .preferredContentSize` on all panels
+- ✅ Tab-switch crash — removed `withAnimation` from `ModeTabs` (layout thrash during animation was the cause)
+- ✅ Responsive AI Editor — `minWidth: 460, idealWidth: 520, maxWidth: 900`
+- ✅ Whisper model download confirmed working — `small` and `large-v3` downloaded and recognized. The `openai_whisper-*` prefix is WhisperKit's internal model ID (argmax distributes OpenAI's Whisper as CoreML on HuggingFace). Users see only "tiny", "base", "small" etc. — not a bug.
+- ✅ Whisper auto-reload after download — no restart required
+- ✅ Settings window z-order — activates app before opening (`NSApp.activate(ignoringOtherApps:)` in MenuBarContent)
+- ✅ Settings window height increased to 430
+- ✅ Status indicator color — teal `circle.fill` when downloaded-but-not-loaded (was gray/empty)
+- ✅ Translate UX — same-language guard + friendly error messages instead of raw Apple errors
+- ✅ Style presets replaced — Boomer 📋 / Gen X 🕶️ / Millennial 🥑 / Gen Z 💅 / Gen Alpha 🔥
+- ✅ `docs/styles.md` — documents each preset and its prompt
+- ✅ Unit tests 20/20 green — `StylePresetsTests` updated for new preset IDs
+- ✅ `SettingsStore.init(settingsURL:)` test-only initializer (tests isolated from user settings)
 - ✅ `macos-swift-expert` skill created at `~/.claude/skills/macos-swift-expert/`
+- ✅ "Re-run Setup Wizard" button in Settings → General
 
 ---
 
-## P0 — Critical (blocks the core flows)
+## P0 — Blocking first release
 
-### application crash when moving between windows
-The test files do not catch the crash that happens when moving between windows. The application always crashes when the user tries to move between style or translate tabs in some instances it was fixed after runing the setup wizard again. THE TEST FILES DO NOT CATCH THIS CRASH. THIS IS A CRITICAL ISSUE!
+### 1. AI Editor opens with empty text box
 
-Settings always open up as the last window in the desktop. I want it to be opened as the first window in the desktop!
+Selected text isn't captured — `SelectionReader.readSelectedText(from:)` returns nil. This breaks the core editor flow.
 
-### I think this part is already fixed. can you confirm it? 
-
-```txt 
-###  Whisper model never finishes downloading / WORONG WHISPER MODEL!
-
-The Models tab shows the Download button, but clicking it never lands a usable model. Voice flow is dead until this is fixed.
-
-- Reproduce: Settings → Models → click Download next to `base`. Tail `~/Library/Application Support/Type.OH/models/` while it runs.
-- Suspects:
-  - `WhisperKit.download(variant:downloadBase:)` may be falling back to its default HF cache dir instead of honoring `downloadBase`.
-  - The variant id (`openai_whisper-base`) might not match what `argmaxinc/whisperkit-coreml` ships — try logging the resolved repo path inside the progressCallback.
-  - `ModelManager.modelFolderURL(for:)` assumes the path persisted in UserDefaults — confirm it matches actual on-disk layout after a successful download.
-- Files: `Type.Oh/Voice/ModelManager.swift`, `Type.Oh/Voice/WhisperService.swift`.
-- **Model: Sonnet 4.6.**
-```
-
-!!! "openai_whisper" this is must be a mistake! we use the apple package whisperKit. where the fuck this openai model came for? do not complicate it. the test files do not catch the crash happens when moving between windows !!! - IMPORTANT!!
-
-### Translate tab UX errors
-
-From manual testing (screenshots 06-08):
-- "Auto-detect" source language shows "unsupported" error — validate that `nil` source maps correctly to Apple's `TranslationSession` auto-detect, or fall back gracefully.
-- Translating English → English shows an ugly system error — guard: if source == target, show a friendly "already in target language" message.
-- Files: `Type.Oh/UI/AIEditorPanel.swift`, `Type.Oh/Editor/TranslationService.swift` (if it exists).
+- Verify `AXIsProcessTrusted()` at hotkey fire time. Log the AX error code.
+- The `⌘C` fallback may be racing the panel activation — increase the sleep delay or capture before the panel opens.
+- Files: `Type.Oh/Editor/SelectionReader.swift`, `Type.Oh/AppDelegate.swift`.
 - **Model: Sonnet 4.6.**
 
----
+### 2. API key saving throws an error
 
-## P1 — High (broken UX)
+Settings → Providers → Set key fails silently or crashes.
 
-### 4. API key saving throws an error
+- Likely `SecItemAdd` returning `errSecDuplicateItem` with no update fallback.
+- Check `KeychainStore.save(key:for:)` — add `SecItemUpdate` when `errSecDuplicateItem` is returned.
+- Files: `Type.Oh/Core/KeychainStore.swift`.
+- **Model: Haiku 4.5.** Small targeted fix.
 
-Adding a key in Settings → Providers fails. Reproduce, capture the actual error, fix the Keychain write.
+### 3. Error banner — replace NSLog with visible toast
 
-- Likely: missing entitlement for keychain access groups, or `SecItemAdd` returning `errSecDuplicateItem` without an update fallback.
-- Files: `Type.Oh/Core/KeychainStore.swift`, `Type.Oh/UI/SettingsWindow.swift`.
-- **Model: Sonnet 4.6.**
+Errors (model load failure, voice errors, paste errors) are NSLog-only — invisible to the user.
 
-### 5. Error banner — replace NSLog with in-app toast
-
-`showBannerError` currently just NSLogs. Replace with a brief floating toast visible to the user so voice errors and model-load errors are actually surfaced.
-
-- A small `NSPanel`-based toast at the bottom-center of the screen that auto-dismisses after 4 s is sufficient.
+- Add a small floating toast panel that auto-dismisses after 4 s.
 - File: `Type.Oh/AppDelegate.swift`, new `Type.Oh/UI/ToastOverlay.swift`.
 - **Model: Haiku 4.5.**
 
 ---
 
-## P2 — Medium (polish)
+## P1 — High (rough UX)
 
-### 7. Settings window height
+### 4. Translate — language pack auto-download prompt
 
-The `SettingsWindow` frame is `height: 360` — the new "Re-run Setup Wizard" button may clip. Increase to `420` or switch to auto-sizing.
-- File: `Type.Oh/UI/SettingsWindow.swift:16`.
+When the user picks a target language, Apple's TranslationSession can prompt to download the language pack. Currently this only happens when Translate is tapped — it should prompt immediately when the user selects the language pair.
+
+- Use `TranslationSession.Configuration` with `prepareTranslation()` to trigger the download prompt on language selection.
+- File: `Type.Oh/UI/AIEditorPanel.swift`, `Type.Oh/UI/LanguagePicker.swift`.
+- **Model: Sonnet 4.6.**
+
+### 5. Onboarding re-run — reset `hasCompletedOnboarding`
+
+When "Re-run Setup Wizard" is triggered, `hasCompletedOnboarding` should be reset so the wizard flows cleanly from step 1. Currently it shows but the flag isn't cleared.
+
+- In `AppDelegate.showOnboarding()`, set `settingsStore.hasCompletedOnboarding = false` before showing the panel.
+- File: `Type.Oh/AppDelegate.swift`.
 - **Model: Haiku 4.5.**
 
-### 8. App icon placeholder
+---
 
-Generate a 1024×1024 + full macOS icon set. Suggested motif: stylized waveform fused with a text caret on a tinted background. Drop into `Type.Oh/Assets.xcassets/AppIcon.appiconset/`.
+## P2 — Polish (pre-release nice-to-have)
+
+### 6. App icon
+
+Generate a placeholder 1024×1024 + full macOS icon set. Suggested motif: stylized waveform fused with a text caret. Drop into `Type.Oh/Assets.xcassets/AppIcon.appiconset/`.
 - **Model: Sonnet 4.6** with the `algorithmic-art` or `canvas-design` skill.
 
-### 9. Onboarding re-run polish
+### 7. UI polish pass — onboarding & settings
 
-When "Re-run Setup Wizard" fires, `hasCompletedOnboarding` should reset to `false` so the wizard flows from step 1 and sets it back to `true` on Finish. Currently the wizard shows but a returning user may see stale state.
-- File: `Type.Oh/AppDelegate.swift`, `Type.Oh/UI/OnboardingWizard.swift`.
-new screenshot for settings window and wizard screens are ready in '/Volumes/Works/Antygravity-workspaces/Type.OH/screenshots_02-05-2026-17.29.'
-review it and fix the UI. Make it nicer.
+Screenshots in `screenshots_02-05-2026-17.29/` show the wizard and Settings are functional but plain. Improve visual hierarchy, spacing, and progress bar prominence.
+- Files: `Type.Oh/UI/OnboardingWizard.swift`, `Type.Oh/UI/SettingsWindow.swift`.
 - **Model: Sonnet 4.6.**
 
 ---
 
-## P3 — Future / V2
+## P3 — V2
 
 ### macOS 15+ backward compatibility
 
-Right-click Services extension has been removed from scope. The next V2 feature is backward compat with macOS 15+ for users not on macOS 26 Tahoe.
-
-- On macOS 15, `FoundationModels` is unavailable — cloud provider fallback becomes the default.
-- All other flows (voice, hotkeys, panel UI) should degrade gracefully with `#available` guards.
-- **Model: Opus 4.7.** Architectural — touches every file that uses `FoundationModels`.
+On macOS 15, `FoundationModels` is unavailable — cloud provider fallback becomes the default. All other flows should degrade gracefully with `#available` guards.
+- **Model: Opus 4.7.** Architectural.

@@ -12,7 +12,7 @@ struct ModeTabs: View {
     var body: some View {
         HStack(spacing: 2) {
             ForEach(EditorMode.allCases, id: \.self) { m in
-                Button(m.rawValue) { withAnimation(.easeInOut(duration: 0.15)) { mode = m } }
+                Button(m.rawValue) { mode = m }
                     .buttonStyle(TabStyle(isSelected: mode == m))
             }
         }

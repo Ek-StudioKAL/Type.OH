@@ -162,7 +162,14 @@ struct AIEditorPanel: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
+                    let msg = error.localizedDescription
+                    if msg.localizedCaseInsensitiveContains("unsupported") {
+                        errorMessage = "Auto-detect isn't supported for this pair — select a source language manually."
+                    } else if msg.localizedCaseInsensitiveContains("same") || msg.localizedCaseInsensitiveContains("identical") {
+                        errorMessage = "Source and target language are the same."
+                    } else {
+                        errorMessage = "Translation failed — make sure the language pack is downloaded in System Settings → Language & Region."
+                    }
                     isProcessing = false
                 }
             }
@@ -185,6 +192,13 @@ struct AIEditorPanel: View {
         isProcessing = true
 
         if mode == .translate {
+            // Guard: source and target must differ when source is explicit
+            if let src = sourceLanguage,
+               src.languageCode == targetLanguage.languageCode {
+                errorMessage = "Source and target language are the same — pick a different target."
+                isProcessing = false
+                return
+            }
             let langChanged = sourceLanguage != prevSourceLang || targetLanguage != prevTargetLang
             if translationConfig == nil || langChanged {
                 translationConfig = TranslationSession.Configuration(source: sourceLanguage, target: targetLanguage)

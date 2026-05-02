@@ -23,7 +23,7 @@ struct StylePresetsTests {
 
     @Test func knownPresetsPresent() {
         let ids = Set(StylePresets.all.map(\.id))
-        for expected in ["formal", "concise", "friendly", "corporate", "pirate"] {
+        for expected in ["boomer", "genx", "millennial", "genz", "alpha"] {
             #expect(ids.contains(expected), "Missing preset: \(expected)")
         }
     }

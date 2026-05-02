@@ -13,7 +13,7 @@ struct SettingsWindow: View {
             ModelsTab()
                 .tabItem { Label("Models", systemImage: "waveform") }
         }
-        .frame(width: 480, height: 360)
+        .frame(width: 480, height: 430)
     }
 }
 
@@ -160,8 +160,8 @@ private struct ModelsTab: View {
                             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                             Text("Loaded: \(info.displayName)")
                         } else if manager.isDownloaded(settings.whisperModel) {
-                            Image(systemName: "circle").foregroundStyle(.secondary)
-                            Text("Ready (loads on first use)").foregroundStyle(.secondary)
+                            Image(systemName: "circle.fill").foregroundStyle(.teal)
+                            Text("Ready — loads on first use").foregroundStyle(.secondary)
                         } else {
                             Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
                             Text("No model downloaded").foregroundStyle(.secondary)
