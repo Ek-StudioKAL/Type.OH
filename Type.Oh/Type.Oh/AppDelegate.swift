@@ -116,9 +116,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showEditorPanel(with text: String) {
         editorPanel?.close()
 
-        let panel = makePanel(size: CGSize(width: 540, height: 460), titled: true)
-        panel.title = "AI Editor"
-
         let content = AIEditorPanel(
             originalText: text,
             onApply: { [weak self] result in
@@ -133,8 +130,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
         .environment(settingsStore)
-
-        panel.contentView = NSHostingView(rootView: content)
+        
+        // Create hosting view first to get its fitting size
+        let hostingView = NSHostingView(rootView: content)
+        let fittingSize = hostingView.fittingSize
+        
+        let panel = makePanel(size: fittingSize, titled: true)
+        panel.title = "AI Editor"
+        panel.contentView = hostingView
+        
         panel.center()
         bringPanelFront(panel)
         editorPanel = panel
@@ -145,16 +149,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showOnboarding() {
         onboardingPanel?.close()
 
-        let panel = makePanel(size: CGSize(width: 560, height: 520), titled: true)
-        panel.title = "Welcome to Type.OH"
-
         let content = OnboardingWizard(onFinish: { [weak self] in
             self?.onboardingPanel?.close()
             self?.onboardingPanel = nil
         })
         .environment(settingsStore)
-
-        panel.contentView = NSHostingView(rootView: content)
+        
+        // Create hosting view first to get its fitting size
+        let hostingView = NSHostingView(rootView: content)
+        let fittingSize = hostingView.fittingSize
+        
+        let panel = makePanel(size: fittingSize, titled: true)
+        panel.title = "Welcome to Type.OH"
+        panel.contentView = hostingView
+        
         panel.center()
         bringPanelFront(panel)
         onboardingPanel = panel
@@ -182,6 +190,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.isOpaque        = titled
         panel.hasShadow       = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        
+        // Prevent the panel from being resizable to avoid constraint update loops
+        panel.styleMask.remove(.resizable)
+        
         return panel
     }
 
