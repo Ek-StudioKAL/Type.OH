@@ -128,6 +128,8 @@ private struct ProvidersTab: View {
 private struct ModelsTab: View {
     @Environment(SettingsStore.self) private var settings
     @State private var manager = ModelManager.shared
+    @State private var ramMB: Double = ModelManager.processResidentMB
+    @State private var ramTimer: Timer?
 
     var body: some View {
         @Bindable var settings = settings
@@ -139,6 +141,28 @@ private struct ModelsTab: View {
                     }
                 }
                 .onChange(of: settings.whisperModel) { settings.save() }
+
+                LabeledContent("Status") {
+                    HStack(spacing: 6) {
+                        if let loaded = manager.loadedModelID,
+                           let info   = manager.catalogue.first(where: { $0.id == loaded }) {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                            Text("Loaded: \(info.displayName)")
+                        } else if manager.isDownloaded(settings.whisperModel) {
+                            Image(systemName: "circle").foregroundStyle(.secondary)
+                            Text("Ready (loads on first use)").foregroundStyle(.secondary)
+                        } else {
+                            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                            Text("No model downloaded").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                LabeledContent("Memory in use") {
+                    Text(String(format: "%.0f MB", ramMB))
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
             }
             if let err = manager.lastError {
                 Section {
@@ -153,6 +177,20 @@ private struct ModelsTab: View {
         }
         .formStyle(.grouped)
         .padding()
+        .onAppear { startRAMPolling() }
+        .onDisappear { stopRAMPolling() }
+    }
+
+    private func startRAMPolling() {
+        ramMB = ModelManager.processResidentMB
+        ramTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            Task { @MainActor in ramMB = ModelManager.processResidentMB }
+        }
+    }
+
+    private func stopRAMPolling() {
+        ramTimer?.invalidate()
+        ramTimer = nil
     }
 
     @ViewBuilder

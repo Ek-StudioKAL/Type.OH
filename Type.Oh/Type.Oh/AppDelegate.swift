@@ -1,6 +1,6 @@
 import AppKit
-import SwiftUI
 import ApplicationServices
+import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -14,8 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private      let audioRecorder    = AudioRecorder()
     private      let whisperService   = WhisperService()
 
-    private var recordingPanel: NSPanel?
-    private var editorPanel:    NSPanel?
+    private var recordingPanel:  NSPanel?
+    private var editorPanel:     NSPanel?
+    private var onboardingPanel: NSPanel?
 
     // MARK: - App lifecycle
 
@@ -26,15 +27,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotkeyManager.shared.onEditorHotkey = { [weak self] in Task { @MainActor in await self?.handleEditorKey() } }
         HotkeyManager.shared.register(voice: settingsStore.voiceHotkey, editor: settingsStore.editorHotkey)
 
-        // Prompt for Accessibility permission on first launch if missing
-        if !AXIsProcessTrusted() {
-            let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
-            AXIsProcessTrustedWithOptions(opts)
+        // Pre-load the last-used Whisper model only if it's already downloaded
+        if let folder = ModelManager.shared.modelFolderURL(for: settingsStore.whisperModel),
+           ModelManager.shared.isDownloaded(settingsStore.whisperModel) {
+            let name = settingsStore.whisperModel
+            Task { try? await whisperService.loadModel(name: name, at: folder) }
         }
 
-        // Pre-load the last-used Whisper model only if it's already downloaded
-        if ModelManager.shared.isDownloaded(settingsStore.whisperModel) {
-            Task { try? await whisperService.loadModel(settingsStore.whisperModel) }
+        // First-launch onboarding handles permission prompts itself.
+        // For returning users with missing AX, fall back to the system trust prompt.
+        if !settingsStore.hasCompletedOnboarding {
+            showOnboarding()
+        } else if !AXIsProcessTrusted() {
+            let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
+            AXIsProcessTrustedWithOptions(opts)
         }
     }
 
@@ -51,6 +57,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 showBannerError(error.localizedDescription)
             }
         } else {
+            let modelName = settingsStore.whisperModel
+            guard let folder = ModelManager.shared.modelFolderURL(for: modelName) else {
+                showBannerError("No Whisper model downloaded. Open Settings → Models to download one.")
+                return
+            }
+            do {
+                try await whisperService.ensureLoaded(name: modelName, at: folder)
+            } catch {
+                showBannerError("Failed to load Whisper model: \(error.localizedDescription)")
+                return
+            }
             focusCapture.capture()
             do {
                 try await audioRecorder.start()
@@ -74,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 y: screen.visibleFrame.minY + 60
             ))
         }
-        panel.orderFront(nil)
+        bringPanelFront(panel)
         recordingPanel = panel
     }
 
@@ -88,7 +105,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func handleEditorKey() async {
         focusCapture.capture()
         let capturedApp = focusCapture.capturedApp
+        NSLog("[Type.OH] Editor hotkey — AX trusted: %d, source: %@",
+              AXIsProcessTrusted() ? 1 : 0,
+              capturedApp?.localizedName ?? "(none)")
         let text = await selectionReader.readSelectedText(from: capturedApp)
+        NSLog("[Type.OH] Selection captured: %d chars", text?.count ?? -1)
         showEditorPanel(with: text ?? "")
     }
 
@@ -115,16 +136,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         panel.contentView = NSHostingView(rootView: content)
         panel.center()
-        panel.makeKeyAndOrderFront(nil)
-        NSApp.activate()
+        bringPanelFront(panel)
         editorPanel = panel
+    }
+
+    // MARK: - Onboarding
+
+    private func showOnboarding() {
+        onboardingPanel?.close()
+
+        let panel = makePanel(size: CGSize(width: 560, height: 520), titled: true)
+        panel.title = "Welcome to Type.OH"
+
+        let content = OnboardingWizard(onFinish: { [weak self] in
+            self?.onboardingPanel?.close()
+            self?.onboardingPanel = nil
+        })
+        .environment(settingsStore)
+
+        panel.contentView = NSHostingView(rootView: content)
+        panel.center()
+        bringPanelFront(panel)
+        onboardingPanel = panel
     }
 
     // MARK: - Helpers
 
     private func makePanel(size: CGSize, titled: Bool) -> NSPanel {
-        var style: NSWindow.StyleMask = [.nonactivatingPanel, .borderless]
-        if titled { style = [.titled, .closable, .resizable] }
+        // .resizable + SwiftUI NSHostingView causes an infinite updateConstraints loop that
+        // crashes the app (NSGenericException in _postWindowNeedsUpdateConstraints).
+        // Titled panels need .nonactivatingPanel so they render in front under LSUIElement.
+        let style: NSWindow.StyleMask = titled
+            ? [.titled, .closable, .nonactivatingPanel]
+            : [.nonactivatingPanel, .borderless]
 
         let panel = NSPanel(
             contentRect: CGRect(origin: .zero, size: size),
@@ -139,6 +183,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.hasShadow       = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         return panel
+    }
+
+    private func bringPanelFront(_ panel: NSPanel) {
+        // Briefly promote to regular policy so NSApp.activate() raises the window
+        // above foreground apps, then revert to accessory (no Dock icon).
+        NSApp.setActivationPolicy(.regular)
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        NSApp.setActivationPolicy(.accessory)
     }
 
     private func showBannerError(_ message: String) {

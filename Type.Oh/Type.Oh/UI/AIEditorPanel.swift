@@ -1,3 +1,5 @@
+import AppKit
+import ApplicationServices
 import SwiftUI
 import Translation
 
@@ -8,6 +10,8 @@ struct AIEditorPanel: View {
     let onApply:  (String) -> Void
     let onCancel: () -> Void
 
+    // editableInput starts as originalText but can be overridden via the Paste button
+    @State private var editableInput: String
     @State private var mode: EditorMode = .fix
     @State private var selectedStyle: StylePreset? = StylePresets.all.first
     @State private var result       = ""
@@ -20,6 +24,13 @@ struct AIEditorPanel: View {
     @State private var translationConfig: TranslationSession.Configuration?
     @State private var prevSourceLang:  Locale.Language?
     @State private var prevTargetLang   = Locale.Language(identifier: "en")
+
+    init(originalText: String, onApply: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+        self.originalText = originalText
+        self.onApply  = onApply
+        self.onCancel = onCancel
+        self._editableInput = State(initialValue: originalText)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -35,21 +46,70 @@ struct AIEditorPanel: View {
                 LanguagePicker(sourceLanguage: $sourceLanguage, targetLanguage: $targetLanguage)
             }
 
-            // Text panes
-            Group {
-                if mode == .fix && !result.isEmpty {
-                    DiffTextView(original: originalText, result: result)
-                        .frame(minHeight: 120)
-                } else {
+            // Input area with Paste fallback
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Input")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        if let clip = NSPasteboard.general.string(forType: .string), !clip.isEmpty {
+                            editableInput = clip
+                            result = ""
+                        }
+                    } label: {
+                        Label("Paste", systemImage: "doc.on.clipboard")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Replace input with clipboard contents")
+                }
+
+                ScrollView {
+                    if editableInput.isEmpty {
+                        EmptyInputNotice()
+                    } else {
+                        Text(editableInput)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(10)
+                .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+                .frame(minHeight: 60, maxHeight: 120)
+            }
+
+            // Result area
+            if !result.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Result")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(result, forType: .string)
+                        } label: {
+                            Label("Copy", systemImage: "doc.on.doc")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Copy result to clipboard")
+                    }
+
                     ScrollView {
-                        Text(result.isEmpty ? originalText : result)
+                        Text(result)
                             .font(.body)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(10)
                     .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-                    .frame(minHeight: 80)
+                    .frame(minHeight: 60, maxHeight: 120)
                 }
             }
 
@@ -79,7 +139,7 @@ struct AIEditorPanel: View {
 
                 Button(actionLabel) { Task { await runAction() } }
                     .buttonStyle(.bordered)
-                    .disabled(isProcessing)
+                    .disabled(isProcessing || editableInput.isEmpty)
 
                 if !result.isEmpty {
                     Button("Apply") { onApply(result) }
@@ -93,7 +153,7 @@ struct AIEditorPanel: View {
         // Translation is handled via this modifier; triggered by setting/invalidating translationConfig.
         .translationTask(translationConfig) { session in
             do {
-                let response = try await session.translate(originalText)
+                let response = try await session.translate(editableInput)
                 await MainActor.run {
                     result = response.targetText
                     isProcessing = false
@@ -143,9 +203,9 @@ struct AIEditorPanel: View {
                     isProcessing = false
                     return
                 }
-                result = try await provider.applyStyle(preset, to: originalText, emojify: settings.emojify)
+                result = try await provider.applyStyle(preset, to: editableInput, emojify: settings.emojify)
             case .fix:
-                result = try await provider.fix(text: originalText, emojify: settings.emojify)
+                result = try await provider.fix(text: editableInput, emojify: settings.emojify)
             case .translate:
                 break
             }
@@ -153,5 +213,41 @@ struct AIEditorPanel: View {
             errorMessage = error.localizedDescription
         }
         isProcessing = false
+    }
+}
+
+private struct EmptyInputNotice: View {
+    private var axTrusted: Bool { AXIsProcessTrusted() }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if axTrusted {
+                Text("No selected text was captured.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                Text("Select text in another app before pressing the hotkey, or use Paste above.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Accessibility permission missing")
+                        .font(.body.weight(.medium))
+                }
+                Text("Type.OH needs Accessibility access to read selected text from other apps. Grant it once, then re-launch the app.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("Open Accessibility Settings") {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

@@ -5,28 +5,22 @@ actor WhisperService {
     private var whisperKit: WhisperKit?
     private var loadedModel: String?
 
-    private var modelsDirectory: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Type.OH/models")
-    }
+    /// Snapshot of currently-loaded model name. Nil when nothing is loaded.
+    var currentlyLoadedModel: String? { loadedModel }
 
-    private func modelFolder(for name: String) -> URL {
-        modelsDirectory
-            .appendingPathComponent("argmaxinc")
-            .appendingPathComponent("whisperkit-coreml")
-            .appendingPathComponent(name)
-    }
-
-    func loadModel(_ name: String) async throws {
+    /// Load (or reload) the model from the exact folder URL returned by ModelManager.download().
+    func loadModel(name: String, at folderURL: URL) async throws {
         if loadedModel == name, whisperKit != nil { return }
-        let folder = modelFolder(for: name)
-        guard let entries = try? FileManager.default.contentsOfDirectory(atPath: folder.path),
-              !entries.isEmpty else {
-            throw WhisperError.modelNotDownloaded(name)
-        }
-        let config = WhisperKitConfig(model: name, modelFolder: folder.path, download: false)
+        let config = WhisperKitConfig(model: name, modelFolder: folderURL.path, download: false)
         whisperKit = try await WhisperKit(config)
         loadedModel = name
+        await ModelManager.shared.markLoaded(name)
+    }
+
+    /// Ensure the model is loaded before transcription; loads on-demand if needed.
+    func ensureLoaded(name: String, at folderURL: URL) async throws {
+        guard loadedModel != name || whisperKit == nil else { return }
+        try await loadModel(name: name, at: folderURL)
     }
 
     func transcribe(audio: [Float]) async throws -> String {

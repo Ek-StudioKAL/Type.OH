@@ -40,6 +40,7 @@ final class SettingsStore {
     var targetLanguage:  String        = "en"
     var emojify:         Bool          = false
     var launchAtLogin:   Bool          = false
+    var hasCompletedOnboarding: Bool   = false
 
     private let fileURL: URL
 
@@ -69,6 +70,7 @@ private extension SettingsStore {
         var voiceHotkey, editorHotkey: HotkeyConfig
         var activeProvider: ProviderID
         var emojify, launchAtLogin: Bool
+        var hasCompletedOnboarding: Bool?
 
         init(_ s: SettingsStore) {
             whisperModel   = s.whisperModel
@@ -79,6 +81,7 @@ private extension SettingsStore {
             targetLanguage = s.targetLanguage
             emojify        = s.emojify
             launchAtLogin  = s.launchAtLogin
+            hasCompletedOnboarding = s.hasCompletedOnboarding
         }
 
         func apply(to s: SettingsStore) {
@@ -90,6 +93,7 @@ private extension SettingsStore {
             s.targetLanguage = targetLanguage
             s.emojify        = emojify
             s.launchAtLogin  = launchAtLogin
+            s.hasCompletedOnboarding = hasCompletedOnboarding ?? false
         }
     }
 }

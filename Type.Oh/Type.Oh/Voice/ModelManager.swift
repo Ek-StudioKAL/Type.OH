@@ -24,8 +24,33 @@ final class ModelManager {
     private(set) var downloadProgress: Double = 0
     private(set) var downloadingModelID: String?
     private(set) var lastError: String?
+    private(set) var loadedModelID: String?
 
     var isDownloading: Bool { downloadingModelID != nil }
+
+    func markLoaded(_ modelID: String) {
+        loadedModelID = modelID
+    }
+
+    /// Resident memory of this process, in MB. Used to display approximate RAM usage in Settings.
+    static var processResidentMB: Double {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else { return 0 }
+        return Double(info.resident_size) / 1_048_576.0
+    }
+
+    // Exact folder URLs returned by WhisperKit.download(), keyed by modelID.
+    // WhisperKit's HubApi appends repo.type.rawValue ("models") + repo.id + variantPath,
+    // so the real path differs from a naive manual construction. We capture and persist it.
+    private var _downloadedPaths: [String: URL] = [:]
+
+    private static let defaultsKey = "whisper.downloadedPaths"
 
     let modelsDirectory: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -34,22 +59,21 @@ final class ModelManager {
 
     private init() {
         try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+        if let dict = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String] {
+            _downloadedPaths = dict.compactMapValues { URL(string: $0) }
+        }
     }
 
-    // WhisperKit's HubApi stores models under {downloadBase}/{repo-owner}/{repo-name}/{variant}
-    func modelFolderURL(for modelID: String) -> URL {
-        modelsDirectory
-            .appendingPathComponent("argmaxinc")
-            .appendingPathComponent("whisperkit-coreml")
-            .appendingPathComponent(modelID)
+    /// The exact folder URL for a downloaded model, or nil if not yet downloaded.
+    func modelFolderURL(for modelID: String) -> URL? {
+        _downloadedPaths[modelID]
     }
 
     func isDownloaded(_ modelID: String) -> Bool {
-        let folder = modelFolderURL(for: modelID)
-        guard let contents = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
-            return false
-        }
-        return !contents.isEmpty
+        guard let folder = modelFolderURL(for: modelID) else { return false }
+        return (try? FileManager.default
+            .contentsOfDirectory(atPath: folder.path)
+            .isEmpty == false) ?? false
     }
 
     func download(_ modelID: String) async throws {
@@ -58,7 +82,7 @@ final class ModelManager {
         lastError = nil
         defer { downloadingModelID = nil; downloadProgress = 0 }
         do {
-            _ = try await WhisperKit.download(
+            let folderURL = try await WhisperKit.download(
                 variant: modelID,
                 downloadBase: modelsDirectory,
                 progressCallback: { [weak self] progress in
@@ -68,6 +92,11 @@ final class ModelManager {
                     }
                 }
             )
+            // Persist the exact returned path so isDownloaded() and loadModel() use the right folder.
+            _downloadedPaths[modelID] = folderURL
+            var stored = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
+            stored[modelID] = folderURL.absoluteString
+            UserDefaults.standard.set(stored, forKey: Self.defaultsKey)
         } catch {
             lastError = error.localizedDescription
             throw error

@@ -2,27 +2,47 @@ import Foundation
 import Security
 
 enum KeychainStore {
-    static func save(key: String, for provider: ProviderID) {
-        let service = "com.typeoh.\(provider.rawValue)"
-        let query: [CFString: Any] = [
-            kSecClass:       kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: "apiKey"
+
+    // kSecUseDataProtectionKeychain = true targets the modern data-protection keychain,
+    // which avoids the legacy file-based keychain prompt on macOS (even without sandbox).
+    private static func baseQuery(for provider: ProviderID) -> [CFString: Any] {
+        [
+            kSecClass:                   kSecClassGenericPassword,
+            kSecAttrService:             "com.typeoh.\(provider.rawValue)",
+            kSecAttrAccount:             "apiKey",
+            kSecUseDataProtectionKeychain: true as Any,
         ]
-        SecItemDelete(query as CFDictionary)
-        var add = query
-        add[kSecValueData] = Data(key.utf8)
-        SecItemAdd(add as CFDictionary, nil)
+    }
+
+    @discardableResult
+    static func save(key: String, for provider: ProviderID) -> Bool {
+        var query = baseQuery(for: provider)
+        let data = Data(key.utf8)
+
+        // Try update first (item may already exist)
+        let updateAttrs: [CFString: Any] = [kSecValueData: data]
+        let updateStatus = SecItemUpdate(query as CFDictionary, updateAttrs as CFDictionary)
+
+        if updateStatus == errSecSuccess {
+            return true
+        }
+
+        // Item didn't exist — add it
+        query[kSecValueData] = data
+        query[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlocked
+        let addStatus = SecItemAdd(query as CFDictionary, nil)
+
+        if addStatus != errSecSuccess {
+            NSLog("[Type.OH] Keychain save failed for %@: %d", provider.rawValue, addStatus)
+        }
+        return addStatus == errSecSuccess
     }
 
     static func load(for provider: ProviderID) -> String? {
-        let query: [CFString: Any] = [
-            kSecClass:       kSecClassGenericPassword,
-            kSecAttrService: "com.typeoh.\(provider.rawValue)",
-            kSecAttrAccount: "apiKey",
-            kSecReturnData:  true,
-            kSecMatchLimit:  kSecMatchLimitOne
-        ]
+        var query = baseQuery(for: provider)
+        query[kSecReturnData]  = true
+        query[kSecMatchLimit]  = kSecMatchLimitOne
+
         var result: AnyObject?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
               let data = result as? Data else { return nil }
@@ -30,11 +50,6 @@ enum KeychainStore {
     }
 
     static func delete(for provider: ProviderID) {
-        let query: [CFString: Any] = [
-            kSecClass:       kSecClassGenericPassword,
-            kSecAttrService: "com.typeoh.\(provider.rawValue)",
-            kSecAttrAccount: "apiKey"
-        ]
-        SecItemDelete(query as CFDictionary)
+        SecItemDelete(baseQuery(for: provider) as CFDictionary)
     }
 }
