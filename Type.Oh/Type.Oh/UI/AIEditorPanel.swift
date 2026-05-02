@@ -7,6 +7,7 @@ struct AIEditorPanel: View {
     @Environment(SettingsStore.self) private var settings
 
     let originalText: String
+    let isSticky: Bool
     let onApply:  (String) -> Void
     let onCancel: () -> Void
 
@@ -25,8 +26,9 @@ struct AIEditorPanel: View {
     @State private var prevSourceLang:  Locale.Language?
     @State private var prevTargetLang   = Locale.Language(identifier: "en")
 
-    init(originalText: String, onApply: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+    init(originalText: String, isSticky: Bool = false, onApply: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
         self.originalText = originalText
+        self.isSticky = isSticky
         self.onApply  = onApply
         self.onCancel = onCancel
         self._editableInput = State(initialValue: originalText)
@@ -79,7 +81,7 @@ struct AIEditorPanel: View {
                 }
                 .padding(10)
                 .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-                .frame(minHeight: 60, maxHeight: 120)
+                .frame(minHeight: 60, maxHeight: 160)
             }
 
             // Result area
@@ -109,7 +111,7 @@ struct AIEditorPanel: View {
                     }
                     .padding(10)
                     .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-                    .frame(minHeight: 60, maxHeight: 120)
+                    .frame(minHeight: 60, maxHeight: 160)
                 }
             }
 
@@ -128,7 +130,7 @@ struct AIEditorPanel: View {
 
             // Action bar
             HStack {
-                Button("Cancel") { onCancel() }
+                Button(isSticky ? "Done" : "Cancel") { onCancel() }
                     .keyboardShortcut(.escape)
 
                 Spacer()
@@ -149,7 +151,7 @@ struct AIEditorPanel: View {
             }
         }
         .padding(20)
-        .frame(width: 500)
+        .frame(minWidth: 460, idealWidth: 520, maxWidth: 900)
         // Translation is handled via this modifier; triggered by setting/invalidating translationConfig.
         .translationTask(translationConfig) { session in
             do {

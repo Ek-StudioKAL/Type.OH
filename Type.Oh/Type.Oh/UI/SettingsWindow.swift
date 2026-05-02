@@ -38,6 +38,17 @@ private struct GeneralTab: View {
                         toggleLoginItem(enabled)
                         settings.save()
                     }
+                Toggle("Show in Dock", isOn: $settings.showInDock)
+                    .onChange(of: settings.showInDock) { _, show in
+                        NSApp.setActivationPolicy(show ? .regular : .accessory)
+                        settings.save()
+                    }
+            }
+            Section {
+                Button("Re-run Setup Wizard…") {
+                    NotificationCenter.default.post(name: NSNotification.Name("typeoh.showOnboarding"), object: nil)
+                }
+                .help("Reopen the onboarding wizard to reconfigure permissions, models, and providers")
             }
         }
         .formStyle(.grouped)

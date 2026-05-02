@@ -1,23 +1,25 @@
 import SwiftUI
 
 struct MenuBarContent: View {
-    @Environment(SettingsStore.self) private var settings
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
-        Text("Type.OH")
-            .font(.headline)
-            .foregroundStyle(.secondary)
-            .padding(.bottom, 2)
+        Button("Type.OH") {
+            NotificationCenter.default.post(name: NSNotification.Name("typeoh.showAbout"), object: nil)
+        }
 
-        Divider()
+        Button("Dictate") {
+            NotificationCenter.default.post(name: NSNotification.Name("typeoh.voiceHotkey"), object: nil)
+        }
+
+        Button("ReTypeOH") {
+            NotificationCenter.default.post(name: NSNotification.Name("typeoh.editorHotkey.sticky"), object: nil)
+        }
 
         Button("Settings…") { openSettings() }
-            .keyboardShortcut(",", modifiers: .command)
 
         Divider()
 
         Button("Quit Type.OH") { NSApp.terminate(nil) }
-            .keyboardShortcut("q", modifiers: .command)
     }
 }

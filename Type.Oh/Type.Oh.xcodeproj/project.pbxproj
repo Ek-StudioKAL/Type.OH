@@ -10,11 +10,30 @@
 		24D7D0452FA5622700FEA8A8 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 24D7D0442FA5622700FEA8A8 /* WhisperKit */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		245E67FD2FA63C6300BB4C21 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 24D7CEE82FA5169800FEA8A8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 24D7CEEF2FA5169800FEA8A8;
+			remoteInfo = Type.Oh;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		245E67F22FA639CB00BB4C21 /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
+		245E67F32FA639D200BB4C21 /* StylePresetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylePresetsTests.swift; sourceTree = "<group>"; };
+		245E67F42FA639D900BB4C21 /* ModelManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerTests.swift; sourceTree = "<group>"; };
+		245E67F92FA63C6300BB4C21 /* Type.OhTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Type.OhTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		24D7CEF02FA5169800FEA8A8 /* Type.Oh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Type.Oh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		245E67FA2FA63C6300BB4C21 /* Type.OhTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Type.OhTests;
+			sourceTree = "<group>";
+		};
 		24D7CEF22FA5169800FEA8A8 /* Type.Oh */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Type.Oh;
@@ -23,6 +42,11 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		245E67F62FA63C6300BB4C21 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
 		24D7CEED2FA5169800FEA8A8 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
@@ -32,11 +56,23 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		245E67F12FA639BD00BB4C21 /* Type.OhTests */ = {
+			isa = PBXGroup;
+			children = (
+				245E67F22FA639CB00BB4C21 /* SettingsStoreTests.swift */,
+				245E67F32FA639D200BB4C21 /* StylePresetsTests.swift */,
+				245E67F42FA639D900BB4C21 /* ModelManagerTests.swift */,
+			);
+			path = Type.OhTests;
+			sourceTree = "<group>";
+		};
 		24D7CEE72FA5169800FEA8A8 = {
 			isa = PBXGroup;
 			children = (
 				24D7CEF22FA5169800FEA8A8 /* Type.Oh */,
+				245E67FA2FA63C6300BB4C21 /* Type.OhTests */,
 				24D7CEF12FA5169800FEA8A8 /* Products */,
+				245E67F12FA639BD00BB4C21 /* Type.OhTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -44,6 +80,7 @@
 			isa = PBXGroup;
 			children = (
 				24D7CEF02FA5169800FEA8A8 /* Type.Oh.app */,
+				245E67F92FA63C6300BB4C21 /* Type.OhTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -51,6 +88,27 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		245E67F82FA63C6300BB4C21 /* Type.OhTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 245E67FF2FA63C6300BB4C21 /* Build configuration list for PBXNativeTarget "Type.OhTests" */;
+			buildPhases = (
+				245E67F52FA63C6300BB4C21 /* Sources */,
+				245E67F62FA63C6300BB4C21 /* Frameworks */,
+				245E67F72FA63C6300BB4C21 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				245E67FE2FA63C6300BB4C21 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				245E67FA2FA63C6300BB4C21 /* Type.OhTests */,
+			);
+			name = Type.OhTests;
+			productName = Type.OhTests;
+			productReference = 245E67F92FA63C6300BB4C21 /* Type.OhTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		24D7CEEF2FA5169800FEA8A8 /* Type.Oh */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 24D7CEFB2FA5169900FEA8A8 /* Build configuration list for PBXNativeTarget "Type.Oh" */;
@@ -82,6 +140,10 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					245E67F82FA63C6300BB4C21 = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = 24D7CEEF2FA5169800FEA8A8;
+					};
 					24D7CEEF2FA5169800FEA8A8 = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
@@ -105,11 +167,17 @@
 			projectRoot = "";
 			targets = (
 				24D7CEEF2FA5169800FEA8A8 /* Type.Oh */,
+				245E67F82FA63C6300BB4C21 /* Type.OhTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		245E67F72FA63C6300BB4C21 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
 		24D7CEEE2FA5169800FEA8A8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
@@ -118,6 +186,11 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		245E67F52FA63C6300BB4C21 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 		24D7CEEC2FA5169800FEA8A8 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
@@ -125,7 +198,53 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		245E67FE2FA63C6300BB4C21 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 24D7CEEF2FA5169800FEA8A8 /* Type.Oh */;
+			targetProxy = 245E67FD2FA63C6300BB4C21 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		245E68002FA63C6300BB4C21 /* Debug configuration for PBXNativeTarget "Type.OhTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "noob-noob420.Type-OhTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Type.Oh.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Type.Oh";
+			};
+			name = Debug;
+		};
+		245E68012FA63C6300BB4C21 /* Release configuration for PBXNativeTarget "Type.OhTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "noob-noob420.Type-OhTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Type.Oh.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Type.Oh";
+			};
+			name = Release;
+		};
 		24D7CEF92FA5169900FEA8A8 /* Debug configuration for PBXProject "Type.Oh" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -313,6 +432,14 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		245E67FF2FA63C6300BB4C21 /* Build configuration list for PBXNativeTarget "Type.OhTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				245E68002FA63C6300BB4C21 /* Debug configuration for PBXNativeTarget "Type.OhTests" */,
+				245E68012FA63C6300BB4C21 /* Release configuration for PBXNativeTarget "Type.OhTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
 		24D7CEEB2FA5169800FEA8A8 /* Build configuration list for PBXProject "Type.Oh" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

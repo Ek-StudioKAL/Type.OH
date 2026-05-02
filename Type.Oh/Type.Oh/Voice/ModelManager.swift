@@ -2,6 +2,10 @@ import Foundation
 import Observation
 import WhisperKit
 
+extension Notification.Name {
+    static let whisperModelDownloaded = Notification.Name("typeoh.whisperModelDownloaded")
+}
+
 struct WhisperModelInfo: Identifiable, Sendable {
     let id: String
     let displayName: String
@@ -97,6 +101,7 @@ final class ModelManager {
             var stored = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
             stored[modelID] = folderURL.absoluteString
             UserDefaults.standard.set(stored, forKey: Self.defaultsKey)
+            NotificationCenter.default.post(name: .whisperModelDownloaded, object: modelID)
         } catch {
             lastError = error.localizedDescription
             throw error

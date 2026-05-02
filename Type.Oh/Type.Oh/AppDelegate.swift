@@ -21,11 +21,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - App lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)   // No Dock icon
+        NSApp.setActivationPolicy(settingsStore.showInDock ? .regular : .accessory)
 
         HotkeyManager.shared.onVoiceHotkey  = { [weak self] in Task { @MainActor in await self?.handleVoiceKey()  } }
         HotkeyManager.shared.onEditorHotkey = { [weak self] in Task { @MainActor in await self?.handleEditorKey() } }
         HotkeyManager.shared.register(voice: settingsStore.voiceHotkey, editor: settingsStore.editorHotkey)
+
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showAbout"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.showAboutPanel() }
+        }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.voiceHotkey"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in await self?.handleVoiceKey() }
+        }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.editorHotkey.sticky"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.showEditorPanel(with: "", sticky: true) }
+        }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showOnboarding"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.showOnboarding() }
+        }
+        NotificationCenter.default.addObserver(forName: .whisperModelDownloaded, object: nil, queue: .main) { [weak self] note in
+            guard let self, let modelID = note.object as? String,
+                  self.settingsStore.whisperModel == modelID,
+                  let folder = ModelManager.shared.modelFolderURL(for: modelID) else { return }
+            Task { @MainActor in
+                try? await self.whisperService.loadModel(name: modelID, at: folder)
+            }
+        }
 
         // Pre-load the last-used Whisper model only if it's already downloaded
         if let folder = ModelManager.shared.modelFolderURL(for: settingsStore.whisperModel),
@@ -79,15 +100,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showRecordingPanel() {
-        let panel = makePanel(size: CGSize(width: 130, height: 44), titled: false)
-        let host  = NSHostingView(rootView: RecordingOverlay())
-        host.frame = CGRect(origin: .zero, size: panel.frame.size)
-        panel.contentView = host
-        panel.setContentSize(host.fittingSize)
+        let hc = NSHostingController(rootView: RecordingOverlay())
+        hc.sizingOptions = .preferredContentSize
+        let panel = makePanel(titled: false)
+        panel.contentViewController = hc
 
         if let screen = NSScreen.main {
+            let size = hc.view.fittingSize
+            panel.setContentSize(size)
             panel.setFrameOrigin(CGPoint(
-                x: screen.visibleFrame.midX - panel.frame.width / 2,
+                x: screen.visibleFrame.midX - size.width / 2,
                 y: screen.visibleFrame.minY + 60
             ))
         }
@@ -113,15 +135,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showEditorPanel(with: text ?? "")
     }
 
-    private func showEditorPanel(with text: String) {
+    func showEditorPanel(with text: String, sticky: Bool = false) {
         editorPanel?.close()
 
         let content = AIEditorPanel(
             originalText: text,
+            isSticky: sticky,
             onApply: { [weak self] result in
                 guard let self else { return }
-                editorPanel?.close()
-                editorPanel = nil
+                if !sticky {
+                    editorPanel?.close()
+                    editorPanel = nil
+                }
                 Task { await self.pasteService.paste(result) }
             },
             onCancel: { [weak self] in
@@ -130,23 +155,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         )
         .environment(settingsStore)
-        
-        // Create hosting view first to get its fitting size
-        let hostingView = NSHostingView(rootView: content)
-        let fittingSize = hostingView.fittingSize
-        
-        let panel = makePanel(size: fittingSize, titled: true)
-        panel.title = "AI Editor"
-        panel.contentView = hostingView
-        
+
+        let hc = NSHostingController(rootView: content)
+        hc.sizingOptions = .preferredContentSize
+        let panel = makePanel(titled: true)
+        panel.title = sticky ? "ReTypeOH" : "AI Editor"
+        panel.contentViewController = hc
+        panel.minSize = CGSize(width: 460, height: 220)
         panel.center()
         bringPanelFront(panel)
         editorPanel = panel
     }
 
+    // MARK: - About panel
+
+    private func showAboutPanel() {
+        AboutPanelController.shared.show()
+    }
+
     // MARK: - Onboarding
 
-    private func showOnboarding() {
+    func showOnboarding() {
         onboardingPanel?.close()
 
         let content = OnboardingWizard(onFinish: { [weak self] in
@@ -154,15 +183,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.onboardingPanel = nil
         })
         .environment(settingsStore)
-        
-        // Create hosting view first to get its fitting size
-        let hostingView = NSHostingView(rootView: content)
-        let fittingSize = hostingView.fittingSize
-        
-        let panel = makePanel(size: fittingSize, titled: true)
+
+        let hc = NSHostingController(rootView: content)
+        hc.sizingOptions = .preferredContentSize
+        let panel = makePanel(titled: true)
         panel.title = "Welcome to Type.OH"
-        panel.contentView = hostingView
-        
+        panel.contentViewController = hc
         panel.center()
         bringPanelFront(panel)
         onboardingPanel = panel
@@ -170,16 +196,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Helpers
 
-    private func makePanel(size: CGSize, titled: Bool) -> NSPanel {
-        // .resizable + SwiftUI NSHostingView causes an infinite updateConstraints loop that
-        // crashes the app (NSGenericException in _postWindowNeedsUpdateConstraints).
-        // Titled panels need .nonactivatingPanel so they render in front under LSUIElement.
+    private func makePanel(titled: Bool) -> NSPanel {
+        // NSHostingController as contentViewController avoids the infinite updateConstraints
+        // loop that crashes when NSHostingView is used as contentView in a non-resizable panel.
+        // Titled panels get .resizable so the window can grow/shrink as SwiftUI content changes.
         let style: NSWindow.StyleMask = titled
-            ? [.titled, .closable, .nonactivatingPanel]
+            ? [.titled, .closable, .resizable, .nonactivatingPanel]
             : [.nonactivatingPanel, .borderless]
 
         let panel = NSPanel(
-            contentRect: CGRect(origin: .zero, size: size),
+            contentRect: .zero,
             styleMask:   style,
             backing:     .buffered,
             defer:       false
@@ -190,20 +216,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.isOpaque        = titled
         panel.hasShadow       = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        
-        // Prevent the panel from being resizable to avoid constraint update loops
-        panel.styleMask.remove(.resizable)
-        
         return panel
     }
 
     private func bringPanelFront(_ panel: NSPanel) {
         // Briefly promote to regular policy so NSApp.activate() raises the window
-        // above foreground apps, then revert to accessory (no Dock icon).
+        // above foreground apps, then revert to the user's preferred policy.
         NSApp.setActivationPolicy(.regular)
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate()
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(settingsStore.showInDock ? .regular : .accessory)
     }
 
     private func showBannerError(_ message: String) {

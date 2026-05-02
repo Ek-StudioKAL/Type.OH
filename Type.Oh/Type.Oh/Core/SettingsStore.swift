@@ -40,6 +40,7 @@ final class SettingsStore {
     var targetLanguage:  String        = "en"
     var emojify:         Bool          = false
     var launchAtLogin:   Bool          = false
+    var showInDock:      Bool          = false
     var hasCompletedOnboarding: Bool   = false
 
     private let fileURL: URL
@@ -70,6 +71,7 @@ private extension SettingsStore {
         var voiceHotkey, editorHotkey: HotkeyConfig
         var activeProvider: ProviderID
         var emojify, launchAtLogin: Bool
+        var showInDock: Bool?
         var hasCompletedOnboarding: Bool?
 
         init(_ s: SettingsStore) {
@@ -81,6 +83,7 @@ private extension SettingsStore {
             targetLanguage = s.targetLanguage
             emojify        = s.emojify
             launchAtLogin  = s.launchAtLogin
+            showInDock     = s.showInDock
             hasCompletedOnboarding = s.hasCompletedOnboarding
         }
 
@@ -93,6 +96,7 @@ private extension SettingsStore {
             s.targetLanguage = targetLanguage
             s.emojify        = emojify
             s.launchAtLogin  = launchAtLogin
+            s.showInDock     = showInDock ?? false
             s.hasCompletedOnboarding = hasCompletedOnboarding ?? false
         }
     }
