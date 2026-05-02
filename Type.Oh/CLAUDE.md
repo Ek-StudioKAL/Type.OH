@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Next-session work is queued in [`TODO.md`](TODO.md)** — prioritized by urgency with per-task model recommendations. Read it before starting new work.
+
 ## Project Overview
 
 **Type.OH** (also called iLazyKey) is a native macOS menu-bar app with two flows triggered by global hotkeys:

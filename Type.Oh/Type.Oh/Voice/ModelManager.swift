@@ -22,7 +22,10 @@ final class ModelManager {
     ]
 
     private(set) var downloadProgress: Double = 0
-    private(set) var isDownloading = false
+    private(set) var downloadingModelID: String?
+    private(set) var lastError: String?
+
+    var isDownloading: Bool { downloadingModelID != nil }
 
     let modelsDirectory: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -33,22 +36,41 @@ final class ModelManager {
         try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
     }
 
+    // WhisperKit's HubApi stores models under {downloadBase}/{repo-owner}/{repo-name}/{variant}
+    func modelFolderURL(for modelID: String) -> URL {
+        modelsDirectory
+            .appendingPathComponent("argmaxinc")
+            .appendingPathComponent("whisperkit-coreml")
+            .appendingPathComponent(modelID)
+    }
+
     func isDownloaded(_ modelID: String) -> Bool {
-        FileManager.default.fileExists(atPath: modelsDirectory.appendingPathComponent(modelID).path)
+        let folder = modelFolderURL(for: modelID)
+        guard let contents = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else {
+            return false
+        }
+        return !contents.isEmpty
     }
 
     func download(_ modelID: String) async throws {
-        isDownloading = true
-        defer { isDownloading = false; downloadProgress = 0 }
-        _ = try await WhisperKit.download(
-            variant: modelID,
-            downloadBase: modelsDirectory,
-            progressCallback: { [weak self] progress in
-                let fraction = progress.fractionCompleted
-                Task { @MainActor [weak self] in
-                    self?.downloadProgress = fraction
+        downloadingModelID = modelID
+        downloadProgress = 0
+        lastError = nil
+        defer { downloadingModelID = nil; downloadProgress = 0 }
+        do {
+            _ = try await WhisperKit.download(
+                variant: modelID,
+                downloadBase: modelsDirectory,
+                progressCallback: { [weak self] progress in
+                    let fraction = progress.fractionCompleted
+                    Task { @MainActor [weak self] in
+                        self?.downloadProgress = fraction
+                    }
                 }
-            }
-        )
+            )
+        } catch {
+            lastError = error.localizedDescription
+            throw error
+        }
     }
 }

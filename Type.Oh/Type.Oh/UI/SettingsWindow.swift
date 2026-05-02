@@ -140,6 +140,11 @@ private struct ModelsTab: View {
                 }
                 .onChange(of: settings.whisperModel) { settings.save() }
             }
+            if let err = manager.lastError {
+                Section {
+                    Text(err).font(.caption).foregroundStyle(.red)
+                }
+            }
             Section {
                 ForEach(manager.catalogue) { m in
                     modelRow(m)
@@ -153,13 +158,25 @@ private struct ModelsTab: View {
     @ViewBuilder
     private func modelRow(_ m: WhisperModelInfo) -> some View {
         let downloaded = manager.isDownloaded(m.id)
+        let isDownloadingThis = manager.downloadingModelID == m.id
         LabeledContent("\(m.displayName) (\(m.sizeDescription))") {
-            if downloaded {
+            if isDownloadingThis {
+                HStack(spacing: 8) {
+                    ProgressView(value: manager.downloadProgress)
+                        .progressViewStyle(.linear)
+                        .frame(width: 90)
+                    Text("\(Int(manager.downloadProgress * 100))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            } else if downloaded {
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             } else {
                 Button("Download") {
                     Task { try? await manager.download(m.id) }
-                }.buttonStyle(.bordered)
+                }
+                .buttonStyle(.bordered)
+                .disabled(manager.isDownloading)
             }
         }
     }

@@ -32,8 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AXIsProcessTrustedWithOptions(opts)
         }
 
-        // Pre-load the last-used Whisper model
-        Task { try? await whisperService.loadModel(settingsStore.whisperModel) }
+        // Pre-load the last-used Whisper model only if it's already downloaded
+        if ModelManager.shared.isDownloaded(settingsStore.whisperModel) {
+            Task { try? await whisperService.loadModel(settingsStore.whisperModel) }
+        }
     }
 
     // MARK: - Voice flow
@@ -114,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.contentView = NSHostingView(rootView: content)
         panel.center()
         panel.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
         editorPanel = panel
     }
 
