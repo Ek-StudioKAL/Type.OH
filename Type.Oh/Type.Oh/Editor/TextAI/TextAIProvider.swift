@@ -7,8 +7,19 @@ protocol TextAIProvider: Sendable {
 
 enum ProviderError: Error, LocalizedError {
     case missingAPIKey
+    case apiError(String)
+    case httpError(Int)
 
-    var errorDescription: String? { "API key not set. Add your key in Settings → Providers." }
+    var errorDescription: String? {
+        switch self {
+        case .missingAPIKey:
+            "API key not set — open Settings → Providers to add it."
+        case .apiError(let msg):
+            "API error: \(msg)"
+        case .httpError(let code):
+            "Server returned HTTP \(code). Check your API key and account status."
+        }
+    }
 }
 
 // Shared prompt builder used by every provider.

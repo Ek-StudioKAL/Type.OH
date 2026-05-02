@@ -6,12 +6,12 @@ Type.OH ships five generational style presets for the AI Editor's Style tab. Eac
 
 ## Boomer 📋
 
-**Target voice:** Baby Boomer professional. Formal, proper, respectful.
+**Target voice:** Baby Boomer Logic: Removes all buzzwords and "feelings." Replaces them with gruff, plain English..
 
 **When to use:** Business emails, cover letters, anything that needs to feel polished and traditional.
 
 **Prompt fragment:**
-> Rewrite the following text in a Baby Boomer communication style: formal, proper grammar, respectful, no slang, gets straight to the point without being curt. The tone should feel like a professional email from someone who values tradition and clear, direct language.
+> Rewrite the following text to be "common sense" and blunt. Remove all corporate jargon, "soft" language, or expressions of feeling. Use short, declarative sentences. The tone should be that of a man who spent 40 years in a factory and has no patience for "fluff." If the original text is long, make the rewrite much shorter and more dismissive.
 
 ---
 

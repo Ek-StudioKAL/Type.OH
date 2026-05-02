@@ -27,9 +27,23 @@ struct AnthropicProvider: TextAIProvider {
             "messages":   [["role": "user", "content": prompt]]
         ])
 
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        let statusCode = (resp as? HTTPURLResponse)?.statusCode ?? 200
+
+        if statusCode != 200 {
+            if let apiErr = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+                throw ProviderError.apiError(apiErr.error.message)
+            }
+            throw ProviderError.httpError(statusCode)
+        }
+
         let json = try JSONDecoder().decode(Response.self, from: data)
         return json.content.first?.text ?? ""
+    }
+
+    private struct APIErrorResponse: Decodable {
+        struct Inner: Decodable { let message: String }
+        let error: Inner
     }
 
     private struct Response: Decodable {

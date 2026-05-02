@@ -39,6 +39,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showOnboarding"), object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.showOnboarding() }
         }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.openSettings"), object: nil, queue: .main) { _ in
+            Task { @MainActor in
+                NSApp.setActivationPolicy(.regular)
+                NSApp.activate(ignoringOtherApps: true)
+                // showSettingsWindow: is the SwiftUI Settings scene's private action selector (macOS 13+)
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+            }
+        }
         NotificationCenter.default.addObserver(forName: .whisperModelDownloaded, object: nil, queue: .main) { [weak self] note in
             guard let self, let modelID = note.object as? String,
                   self.settingsStore.whisperModel == modelID,
@@ -177,6 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showOnboarding() {
         onboardingPanel?.close()
+        settingsStore.hasCompletedOnboarding = false
 
         let content = OnboardingWizard(onFinish: { [weak self] in
             self?.onboardingPanel?.close()
@@ -229,7 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showBannerError(_ message: String) {
-        // TODO: replace with an in-app notification banner
         NSLog("[Type.OH] Error: %@", message)
+        ToastOverlay.shared.show(message)
     }
 }

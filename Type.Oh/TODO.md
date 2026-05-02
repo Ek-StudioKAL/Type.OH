@@ -6,7 +6,7 @@ Items are ordered by urgency. Each one names the most likely files to touch and 
 
 ---
 
-## Completed (2026-05-02)
+## Completed (2026-05-02, session 2)
 
 - ✅ Menu redesign — About / Dictate / ReTypeOH / Settings / Quit
 - ✅ Dock icon toggle (`SettingsStore.showInDock`, Settings → General)
@@ -32,29 +32,15 @@ Items are ordered by urgency. Each one names the most likely files to touch and 
 
 ### 1. AI Editor opens with empty text box
 
-Selected text isn't captured — `SelectionReader.readSelectedText(from:)` returns nil. This breaks the core editor flow.
-
-- Verify `AXIsProcessTrusted()` at hotkey fire time. Log the AX error code.
-- The `⌘C` fallback may be racing the panel activation — increase the sleep delay or capture before the panel opens.
-- Files: `Type.Oh/Editor/SelectionReader.swift`, `Type.Oh/AppDelegate.swift`.
-- **Model: Sonnet 4.6.**
+✅ **Fixed** — `readViaCopy` now waits 150 ms for app activation and 350 ms for clipboard fill (was 80/200 ms), with one automatic retry on empty result.
 
 ### 2. API key saving throws an error
 
-Settings → Providers → Set key fails silently or crashes.
-
-- Likely `SecItemAdd` returning `errSecDuplicateItem` with no update fallback.
-- Check `KeychainStore.save(key:for:)` — add `SecItemUpdate` when `errSecDuplicateItem` is returned.
-- Files: `Type.Oh/Core/KeychainStore.swift`.
-- **Model: Haiku 4.5.** Small targeted fix.
+✅ **Fixed** — Removed `kSecUseDataProtectionKeychain: true` (required missing `keychain-access-groups` entitlement). Changed accessibility to `kSecAttrAccessibleAfterFirstUnlock`.
 
 ### 3. Error banner — replace NSLog with visible toast
 
-Errors (model load failure, voice errors, paste errors) are NSLog-only — invisible to the user.
-
-- Add a small floating toast panel that auto-dismisses after 4 s.
-- File: `Type.Oh/AppDelegate.swift`, new `Type.Oh/UI/ToastOverlay.swift`.
-- **Model: Haiku 4.5.**
+✅ **Fixed** — `ToastOverlay.swift` created. Dark floating pill appears at top-center of screen, auto-dismisses after 4 s. `showBannerError` now calls it. **Remember to add `ToastOverlay.swift` to the Xcode target** (File → Add Files or drag into Project Navigator).
 
 ---
 
@@ -70,11 +56,7 @@ When the user picks a target language, Apple's TranslationSession can prompt to 
 
 ### 5. Onboarding re-run — reset `hasCompletedOnboarding`
 
-When "Re-run Setup Wizard" is triggered, `hasCompletedOnboarding` should be reset so the wizard flows cleanly from step 1. Currently it shows but the flag isn't cleared.
-
-- In `AppDelegate.showOnboarding()`, set `settingsStore.hasCompletedOnboarding = false` before showing the panel.
-- File: `Type.Oh/AppDelegate.swift`.
-- **Model: Haiku 4.5.**
+✅ **Fixed** — `showOnboarding()` now sets `settingsStore.hasCompletedOnboarding = false` before showing the panel.
 
 ---
 

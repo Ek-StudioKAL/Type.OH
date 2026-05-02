@@ -25,7 +25,7 @@
 		245E67F32FA639D200BB4C21 /* StylePresetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylePresetsTests.swift; sourceTree = "<group>"; };
 		245E67F42FA639D900BB4C21 /* ModelManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelManagerTests.swift; sourceTree = "<group>"; };
 		245E67F92FA63C6300BB4C21 /* Type.OhTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Type.OhTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		245E68082FA63D6500BB4C21 /* Type.Oh.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = file; path = Type.Oh.xctestplan; sourceTree = "<group>"; };
+		245E68082FA63D6500BB4C21 /* Type.Oh.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Type.Oh.xctestplan; sourceTree = "<group>"; };
 		24D7CEF02FA5169800FEA8A8 /* Type.Oh.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Type.Oh.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 

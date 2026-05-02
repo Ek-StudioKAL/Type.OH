@@ -3,37 +3,33 @@ import Security
 
 enum KeychainStore {
 
-    // kSecUseDataProtectionKeychain = true targets the modern data-protection keychain,
-    // which avoids the legacy file-based keychain prompt on macOS (even without sandbox).
     private static func baseQuery(for provider: ProviderID) -> [CFString: Any] {
         [
-            kSecClass:                   kSecClassGenericPassword,
-            kSecAttrService:             "com.typeoh.\(provider.rawValue)",
-            kSecAttrAccount:             "apiKey",
-            kSecUseDataProtectionKeychain: true as Any,
+            kSecClass:       kSecClassGenericPassword,
+            kSecAttrService: "com.typeoh.\(provider.rawValue)",
+            kSecAttrAccount: "apiKey",
         ]
     }
 
     @discardableResult
     static func save(key: String, for provider: ProviderID) -> Bool {
-        var query = baseQuery(for: provider)
         let data = Data(key.utf8)
 
         // Try update first (item may already exist)
-        let updateAttrs: [CFString: Any] = [kSecValueData: data]
-        let updateStatus = SecItemUpdate(query as CFDictionary, updateAttrs as CFDictionary)
-
-        if updateStatus == errSecSuccess {
-            return true
-        }
+        let updateStatus = SecItemUpdate(
+            baseQuery(for: provider) as CFDictionary,
+            [kSecValueData: data] as CFDictionary
+        )
+        if updateStatus == errSecSuccess { return true }
 
         // Item didn't exist — add it
-        query[kSecValueData] = data
-        query[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlocked
-        let addStatus = SecItemAdd(query as CFDictionary, nil)
+        var addQuery = baseQuery(for: provider)
+        addQuery[kSecValueData]       = data
+        addQuery[kSecAttrAccessible]  = kSecAttrAccessibleAfterFirstUnlock
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
 
         if addStatus != errSecSuccess {
-            NSLog("[Type.OH] Keychain save failed for %@: %d", provider.rawValue, addStatus)
+            NSLog("[Type.OH] Keychain save failed for %@: OSStatus %d", provider.rawValue, addStatus)
         }
         return addStatus == errSecSuccess
     }

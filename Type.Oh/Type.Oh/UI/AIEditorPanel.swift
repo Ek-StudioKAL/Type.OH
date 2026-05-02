@@ -117,7 +117,25 @@ struct AIEditorPanel: View {
 
             // Error
             if let msg = errorMessage {
-                Text(msg).font(.caption).foregroundStyle(.red)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(msg).font(.caption).foregroundStyle(.red)
+                    if msg.contains("API key") || msg.contains("Settings → Providers") {
+                        HStack(spacing: 12) {
+                            Button("Open Settings → Providers") {
+                                NotificationCenter.default.post(
+                                    name: NSNotification.Name("typeoh.openSettings"), object: nil)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            Button("Re-run Setup Wizard") {
+                                NotificationCenter.default.post(
+                                    name: NSNotification.Name("typeoh.showOnboarding"), object: nil)
+                            }
+                            .buttonStyle(.borderless)
+                            .controlSize(.small)
+                        }
+                    }
+                }
             }
 
             // Emojify toggle
@@ -238,12 +256,20 @@ private struct EmptyInputNotice: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if axTrusted {
-                Text("No selected text was captured.")
+                Text("No text was captured from the source app.")
                     .font(.body)
                     .foregroundStyle(.secondary)
-                Text("Select text in another app before pressing the hotkey, or use Paste above.")
+                Text("Select text before pressing the hotkey, or use Paste above.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Button("Still not working? Re-run Setup Wizard") {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("typeoh.showOnboarding"), object: nil)
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
             } else {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -251,17 +277,25 @@ private struct EmptyInputNotice: View {
                     Text("Accessibility permission missing")
                         .font(.body.weight(.medium))
                 }
-                Text("Type.OH needs Accessibility access to read selected text from other apps. Grant it once, then re-launch the app.")
+                Text("Type.OH needs Accessibility access to read selected text from other apps. Grant it in System Settings, then re-launch.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Open Accessibility Settings") {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                        NSWorkspace.shared.open(url)
+                HStack(spacing: 10) {
+                    Button("Open Accessibility Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+                            NSWorkspace.shared.open(url)
+                        }
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    Button("Re-run Setup Wizard") {
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("typeoh.showOnboarding"), object: nil)
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

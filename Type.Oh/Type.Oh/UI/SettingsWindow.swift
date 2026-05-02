@@ -78,18 +78,46 @@ private struct ProvidersTab: View {
     @State private var storedKeys:       [ProviderID: String] = [:]
     @State private var editingProvider:  ProviderID?
     @State private var draftKey         = ""
+    @State private var saveError:        String?
 
     var body: some View {
         @Bindable var settings = settings
         Form {
             Section {
                 Picker("Active Provider", selection: $settings.activeProvider) {
-                    ForEach(ProviderID.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                    ForEach(ProviderID.allCases, id: \.self) { p in
+                        HStack {
+                            Text(p.displayName)
+                            if p.requiresAPIKey && storedKeys[p] == nil {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundStyle(.orange)
+                                    .imageScale(.small)
+                            }
+                        }
+                        .tag(p)
+                    }
                 }
                 .onChange(of: settings.activeProvider) { settings.save() }
+
+                if settings.activeProvider.requiresAPIKey && storedKeys[settings.activeProvider] == nil {
+                    Label(
+                        "\(settings.activeProvider.displayName) requires an API key — add it below.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                }
             }
             Section("API Keys") {
                 ForEach(ProviderID.allCases.filter(\.requiresAPIKey), id: \.self) { apiKeyRow($0) }
+                Text("If a key you entered before isn't working, tap Change to re-enter it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let err = saveError {
+                Section {
+                    Text(err).font(.caption).foregroundStyle(.red)
+                }
             }
         }
         .formStyle(.grouped)
@@ -106,11 +134,15 @@ private struct ProvidersTab: View {
                     SecureField("Paste key…", text: $draftKey)
                         .frame(width: 190)
                     Button("Save") {
-                        KeychainStore.save(key: draftKey, for: provider)
-                        storedKeys[provider] = draftKey
-                        draftKey = ""; editingProvider = nil
+                        let ok = KeychainStore.save(key: draftKey, for: provider)
+                        if ok {
+                            storedKeys[provider] = draftKey
+                            draftKey = ""; editingProvider = nil; saveError = nil
+                        } else {
+                            saveError = "Keychain error — make sure the app is signed and try again."
+                        }
                     }.buttonStyle(.bordered)
-                    Button("Cancel") { draftKey = ""; editingProvider = nil }
+                    Button("Cancel") { draftKey = ""; editingProvider = nil; saveError = nil }
                 }
             } else {
                 HStack {

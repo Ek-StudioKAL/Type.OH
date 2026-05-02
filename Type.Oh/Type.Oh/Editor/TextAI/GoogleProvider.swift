@@ -2,7 +2,7 @@ import Foundation
 
 struct GoogleProvider: TextAIProvider {
     let apiKey: String
-    private let model = "gemini-1.5-flash"
+    private let model = "gemini-2.0-flash"
 
     func fix(text: String, emojify: Bool) async throws -> String {
         let fragment = "Fix all typos, grammar mistakes, and punctuation errors in the following text. Preserve the original meaning and tone exactly."
@@ -24,9 +24,23 @@ struct GoogleProvider: TextAIProvider {
             "contents": [["parts": [["text": prompt]]]]
         ])
 
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        let statusCode = (resp as? HTTPURLResponse)?.statusCode ?? 200
+
+        if statusCode != 200 {
+            if let apiErr = try? JSONDecoder().decode(APIErrorResponse.self, from: data) {
+                throw ProviderError.apiError(apiErr.error.message)
+            }
+            throw ProviderError.httpError(statusCode)
+        }
+
         let json = try JSONDecoder().decode(Response.self, from: data)
         return json.candidates.first?.content.parts.first?.text ?? ""
+    }
+
+    private struct APIErrorResponse: Decodable {
+        struct Inner: Decodable { let message: String }
+        let error: Inner
     }
 
     private struct Response: Decodable {

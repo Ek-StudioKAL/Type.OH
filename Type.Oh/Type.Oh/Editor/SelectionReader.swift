@@ -37,24 +37,35 @@ final class SelectionReader {
 
     private func readViaCopy(from app: NSRunningApplication?) async -> String? {
         let previous = NSPasteboard.general.string(forType: .string)
-        NSPasteboard.general.clearContents()
 
-        // Re-activate the source app so ⌘C lands there, not on our process
-        if let app {
-            app.activate()
-            try? await Task.sleep(for: .milliseconds(80))
+        // Two attempts: Electron / browser apps can be slow to handle ⌘C
+        for attempt in 1...2 {
+            NSPasteboard.general.clearContents()
+
+            // Re-activate the source app so ⌘C lands there, not on our process.
+            // 150 ms gives the window server time to actually hand focus back.
+            if let app {
+                app.activate()
+                try? await Task.sleep(for: .milliseconds(150))
+            }
+
+            simulateCopy()
+            // 350 ms covers Electron, heavy web views, and other slow clipboard writers
+            try? await Task.sleep(for: .milliseconds(350))
+
+            if let result = NSPasteboard.general.string(forType: .string), !result.isEmpty {
+                NSPasteboard.general.clearContents()
+                if let previous { NSPasteboard.general.setString(previous, forType: .string) }
+                return result
+            }
+
+            NSLog("[Type.OH] readViaCopy attempt %d returned empty — %@",
+                  attempt, attempt < 2 ? "retrying" : "giving up")
         }
-
-        simulateCopy()
-        // 200 ms is enough for even slow apps (Electron, web browsers) to fill the clipboard
-        try? await Task.sleep(for: .milliseconds(200))
-
-        let result = NSPasteboard.general.string(forType: .string)
 
         NSPasteboard.general.clearContents()
         if let previous { NSPasteboard.general.setString(previous, forType: .string) }
-
-        return result
+        return nil
     }
 
     private func simulateCopy() {
