@@ -10,7 +10,7 @@ struct StylePreset: Identifiable, Sendable {
 enum StylePresets {
     static let all: [StylePreset] = [
         StylePreset(id: "boomer",    label: "Boomer",    emoji: "📋",
-            promptFragment: "Rewrite the following text in a Baby Boomer communication style: formal, proper grammar, respectful, no slang, gets straight to the point without being curt. The tone should feel like a professional email from someone who values tradition and clear, direct language."),
+            promptFragment: "Rewrite the following text to be 'common sense' and blunt. Remove all corporate jargon, 'soft' language, or expressions of feeling. Use short, declarative sentences. The tone should be that of a man who spent 40 years in a factory and has no patience for 'fluff'. If the original text is long, make the rewrite much shorter and more dismissive."),
         StylePreset(id: "genx",      label: "Gen X",     emoji: "🕶️",
             promptFragment: "Rewrite the following text in a Gen X style: direct, no-nonsense, slightly dry and sardonic. Skip the corporate fluff and excessive positivity. Speak plainly, as if you've seen it all before and just want to get things done."),
         StylePreset(id: "millennial", label: "Millennial", emoji: "🥑",

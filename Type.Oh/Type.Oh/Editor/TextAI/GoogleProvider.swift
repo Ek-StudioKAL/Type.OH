@@ -2,7 +2,7 @@ import Foundation
 
 struct GoogleProvider: TextAIProvider {
     let apiKey: String
-    private let model = "gemini-2.0-flash"
+    private let model = "gemini-1.5-flash"
 
     func fix(text: String, emojify: Bool) async throws -> String {
         let fragment = "Fix all typos, grammar mistakes, and punctuation errors in the following text. Preserve the original meaning and tone exactly."
