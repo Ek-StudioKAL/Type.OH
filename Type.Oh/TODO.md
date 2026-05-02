@@ -14,14 +14,23 @@ Items are ordered by urgency. Each one names the most likely files to touch and 
 - ✅ Responsive AI Editor panel — `minWidth: 460, idealWidth: 520, maxWidth: 900`
 - ✅ Whisper model auto-reload after download — no restart required (`Notification.Name.whisperModelDownloaded`)
 - ✅ "Re-run Setup Wizard" button added to Settings → General
-- ✅ Unit test files created (`SettingsStoreTests`, `StylePresetsTests`, `ModelManagerTests`) — need Xcode target wiring (see P1 #6)
+- ✅ Unit tests: 20/20 passing (`SettingsStoreTests`, `StylePresetsTests`, `ModelManagerTests`, placeholder `Type_OhTests`) — Xcode target wired and green
+- ✅ `SettingsStore.init(settingsURL:)` test-only initializer added so tests are isolated from user's saved settings
 - ✅ `macos-swift-expert` skill created at `~/.claude/skills/macos-swift-expert/`
 
 ---
 
 ## P0 — Critical (blocks the core flows)
 
-### 1. Whisper model never finishes downloading / fails to load
+### application crash when moving between windows
+The test files do not catch the crash that happens when moving between windows. The application always crashes when the user tries to move between style or translate tabs in some instances it was fixed after runing the setup wizard again. THE TEST FILES DO NOT CATCH THIS CRASH. THIS IS A CRITICAL ISSUE!
+
+Settings always open up as the last window in the desktop. I want it to be opened as the first window in the desktop!
+
+### I think this part is already fixed. can you confirm it? 
+
+```txt 
+###  Whisper model never finishes downloading / WORONG WHISPER MODEL!
 
 The Models tab shows the Download button, but clicking it never lands a usable model. Voice flow is dead until this is fixed.
 
@@ -32,17 +41,11 @@ The Models tab shows the Download button, but clicking it never lands a usable m
   - `ModelManager.modelFolderURL(for:)` assumes the path persisted in UserDefaults — confirm it matches actual on-disk layout after a successful download.
 - Files: `Type.Oh/Voice/ModelManager.swift`, `Type.Oh/Voice/WhisperService.swift`.
 - **Model: Sonnet 4.6.**
+```
 
-### 2. AI Editor opens with an empty text box
+!!! "openai_whisper" this is must be a mistake! we use the apple package whisperKit. where the fuck this openai model came for? do not complicate it. the test files do not catch the crash happens when moving between windows !!! - IMPORTANT!!
 
-Selected text isn't making it into the editor — `SelectionReader.readSelectedText(from:)` is returning nil.
-
-- Likely AX permission isn't actually granted, or the `⌘C` fallback is racing the panel activation.
-- Verify `AXIsProcessTrusted()` at hotkey time and log the AX error.
-- Files: `Type.Oh/Editor/SelectionReader.swift`, `Type.Oh/UI/AIEditorPanel.swift`, `Type.Oh/AppDelegate.swift`.
-- **Model: Sonnet 4.6.**
-
-### 3. Translate tab UX errors
+### Translate tab UX errors
 
 From manual testing (screenshots 06-08):
 - "Auto-detect" source language shows "unsupported" error — validate that `nil` source maps correctly to Apple's `TranslationSession` auto-detect, or fall back gracefully.
@@ -70,16 +73,6 @@ Adding a key in Settings → Providers fails. Reproduce, capture the actual erro
 - File: `Type.Oh/AppDelegate.swift`, new `Type.Oh/UI/ToastOverlay.swift`.
 - **Model: Haiku 4.5.**
 
-### 6. Wire up Xcode test target
-
-Test files exist at `Type.OhTests/` but are not attached to a test scheme. Steps:
-1. Xcode: File → New → Target → Unit Testing Bundle → name `Type.OhTests`
-2. Set "Target to be Tested" to `Type.Oh`
-3. Delete the auto-generated placeholder `.swift` file; the three existing files are already in the project group
-4. Run `⌘U` to confirm all pass
-
-No code changes needed — purely Xcode project configuration.
-
 ---
 
 ## P2 — Medium (polish)
@@ -99,7 +92,9 @@ Generate a 1024×1024 + full macOS icon set. Suggested motif: stylized waveform 
 
 When "Re-run Setup Wizard" fires, `hasCompletedOnboarding` should reset to `false` so the wizard flows from step 1 and sets it back to `true` on Finish. Currently the wizard shows but a returning user may see stale state.
 - File: `Type.Oh/AppDelegate.swift`, `Type.Oh/UI/OnboardingWizard.swift`.
-- **Model: Haiku 4.5.**
+new screenshot for settings window and wizard screens are ready in '/Volumes/Works/Antygravity-workspaces/Type.OH/screenshots_02-05-2026-17.29.'
+review it and fix the UI. Make it nicer.
+- **Model: Sonnet 4.6.**
 
 ---
 

@@ -5,26 +5,29 @@ import Foundation
 @MainActor
 struct SettingsStoreTests {
 
+    /// Fresh store backed by a temp path that doesn't exist — all property defaults are preserved.
+    private func freshStore() -> SettingsStore {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("typeoh-test-\(UUID().uuidString).json")
+        return SettingsStore(settingsURL: url)
+    }
+
     // MARK: - Default values
 
     @Test func defaultWhisperModel() {
-        let store = SettingsStore()
-        #expect(store.whisperModel == "openai_whisper-base")
+        #expect(freshStore().whisperModel == "openai_whisper-base")
     }
 
     @Test func defaultProviderIsAppleOnDevice() {
-        let store = SettingsStore()
-        #expect(store.activeProvider == .appleOnDevice)
+        #expect(freshStore().activeProvider == .appleOnDevice)
     }
 
     @Test func defaultShowInDockIsFalse() {
-        let store = SettingsStore()
-        #expect(store.showInDock == false)
+        #expect(freshStore().showInDock == false)
     }
 
     @Test func defaultOnboardingNotCompleted() {
-        let store = SettingsStore()
-        #expect(store.hasCompletedOnboarding == false)
+        #expect(freshStore().hasCompletedOnboarding == false)
     }
 
     // MARK: - Hotkey defaults

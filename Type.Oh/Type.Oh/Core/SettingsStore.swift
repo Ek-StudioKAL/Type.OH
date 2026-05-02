@@ -53,6 +53,11 @@ final class SettingsStore {
         load()
     }
 
+    /// Test-only initializer. Skips load() so property defaults are used as-is.
+    init(settingsURL: URL) {
+        fileURL = settingsURL
+    }
+
     func save() {
         try? JSONEncoder().encode(Snapshot(self)).write(to: fileURL)
     }
