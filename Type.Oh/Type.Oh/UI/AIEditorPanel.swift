@@ -209,7 +209,10 @@ struct AIEditorPanel: View {
 
     private func triggerPrepare() {
         guard mode == .translate else { return }
-        prepConfig = TranslationSession.Configuration(source: sourceLanguage, target: targetLanguage)
+        // prepareTranslation() requires an explicit source — auto-detect (nil) needs text for LID.
+        guard let src = sourceLanguage else { return }
+        guard src.languageCode != targetLanguage.languageCode else { return }
+        prepConfig = TranslationSession.Configuration(source: src, target: targetLanguage)
     }
 
     private var actionLabel: String {
