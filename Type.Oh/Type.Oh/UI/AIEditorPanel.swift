@@ -23,6 +23,7 @@ struct AIEditorPanel: View {
     @State private var sourceLanguage: Locale.Language? = nil
     @State private var targetLanguage  = Locale.Language(identifier: "en")
     @State private var translationConfig: TranslationSession.Configuration?
+    @State private var prepConfig: TranslationSession.Configuration?
     @State private var prevSourceLang:  Locale.Language?
     @State private var prevTargetLang   = Locale.Language(identifier: "en")
 
@@ -39,13 +40,19 @@ struct AIEditorPanel: View {
 
             // Mode tabs
             ModeTabs(mode: $mode)
-                .onChange(of: mode) { result = ""; errorMessage = nil }
+                .onChange(of: mode) {
+                    result = ""
+                    errorMessage = nil
+                    if mode == .translate { triggerPrepare() }
+                }
 
             // Mode-specific controls
             if mode == .style {
                 StyleChipRow(selected: $selectedStyle)
             } else if mode == .translate {
                 LanguagePicker(sourceLanguage: $sourceLanguage, targetLanguage: $targetLanguage)
+                    .onChange(of: sourceLanguage) { triggerPrepare() }
+                    .onChange(of: targetLanguage) { triggerPrepare() }
             }
 
             // Input area with Paste fallback
@@ -170,6 +177,10 @@ struct AIEditorPanel: View {
         }
         .padding(20)
         .frame(minWidth: 460, idealWidth: 520, maxWidth: 900)
+        // Fires language-pack download sheet immediately on language selection without translating.
+        .translationTask(prepConfig) { session in
+            try? await session.prepareTranslation()
+        }
         // Translation is handled via this modifier; triggered by setting/invalidating translationConfig.
         .translationTask(translationConfig) { session in
             do {
@@ -195,6 +206,14 @@ struct AIEditorPanel: View {
     }
 
     // MARK: - Helpers
+
+    private func triggerPrepare() {
+        guard mode == .translate else { return }
+        // prepareTranslation() requires an explicit source — auto-detect (nil) needs text for LID.
+        guard let src = sourceLanguage else { return }
+        guard src.languageCode != targetLanguage.languageCode else { return }
+        prepConfig = TranslationSession.Configuration(source: src, target: targetLanguage)
+    }
 
     private var actionLabel: String {
         switch mode {

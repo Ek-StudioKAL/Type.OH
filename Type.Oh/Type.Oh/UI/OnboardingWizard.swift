@@ -35,13 +35,20 @@ struct OnboardingWizard: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header with progress
-            VStack(alignment: .leading, spacing: 6) {
-                Text(step.title)
-                    .font(.title2.weight(.semibold))
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(step.title)
+                        .font(.title2.weight(.bold))
+                    Spacer()
+                    Text("\(step.rawValue + 1) of \(Step.allCases.count)")
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+                StepProgressBar(value: progress)
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
 
             Divider()
 
@@ -84,7 +91,7 @@ struct OnboardingWizard: View {
             }
             .padding(20)
         }
-        .frame(width: 560, height: 520)
+        .frame(width: 560, height: 540)
     }
 
     private var progress: Double {
@@ -108,6 +115,26 @@ struct OnboardingWizard: View {
         settings.hasCompletedOnboarding = true
         settings.save()
         onFinish()
+    }
+}
+
+// MARK: - Progress Bar
+
+private struct StepProgressBar: View {
+    let value: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.15))
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: max(0, geo.size.width * value))
+                    .animation(.easeInOut(duration: 0.25), value: value)
+            }
+        }
+        .frame(height: 6)
     }
 }
 
@@ -143,12 +170,16 @@ private struct WelcomeStep: View {
             Image(systemName: icon)
                 .font(.title2)
                 .foregroundStyle(.tint)
-                .frame(width: 28)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.body.weight(.medium))
-                Text(detail).font(.caption).foregroundStyle(.secondary)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.body.weight(.semibold))
+                Text(detail).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -535,7 +566,10 @@ private struct SummaryStep: View {
         HStack {
             Text(label).foregroundStyle(.secondary)
             Spacer()
-            Text(value).font(.body.weight(.medium))
+            Text(value).font(.body.weight(.semibold))
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
     }
 }

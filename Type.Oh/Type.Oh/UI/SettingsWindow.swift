@@ -13,7 +13,7 @@ struct SettingsWindow: View {
             ModelsTab()
                 .tabItem { Label("Models", systemImage: "waveform") }
         }
-        .frame(width: 480, height: 430)
+        .frame(width: 480, height: 460)
     }
 }
 
