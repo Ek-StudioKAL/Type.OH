@@ -96,3 +96,17 @@ See `CONTEXT.md §8` for the full done-when list. Performance targets:
 - `README.md` — user-facing install/usage docs and Whisper model table
 - `docs/careless-whisper-main/` — offline mirror of the Tauri/Rust app that inspired the voice flow UX
 - `docs/telegram_feature_screenshots/` — UX target screenshots for the AI Editor panel
+
+## Remote Agent Notes
+
+When running as a remote Claude Code agent (no Xcode, no macOS SDK):
+
+- **Cannot build or test.** Focus on code correctness through careful reading and type-checking by inspection.
+- **Cannot modify .xcodeproj/.pbxproj.** If you create new Swift files, list them in the PR description — the user adds them to the Xcode target.
+- **Cannot run WhisperKit or FoundationModels.** If a task requires runtime testing of these frameworks, implement the code but clearly mark it as untested in the PR.
+- **Swift 6 concurrency is strict.** All `@Observable` classes need `@MainActor` if they touch UI. Actors are `Sendable` by default. Closures crossing actor boundaries need explicit annotations.
+- **Key patterns in this codebase:**
+  - `SettingsStore` — add new properties to both the stored properties AND `Snapshot` struct (init + apply)
+  - `AppDelegate` — hotkey handlers call `handleVoiceKey()` / `showEditorPanel(with:)`
+  - New UI panels — use `NSPanel` with `.nonActivatingPanel` style (see `RecordingOverlay` for pattern)
+  - New providers — conform to `TextAIProvider` protocol, register in `ProviderRegistry`
