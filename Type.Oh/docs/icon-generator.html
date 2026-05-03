@@ -114,48 +114,64 @@
             <div class="control-group">
                 <label>Bar Count</label>
                 <div class="slider-container">
-                    <input type="range" id="barCount" min="5" max="11" step="2" value="7" oninput="updateParam('barCount', parseInt(this.value))">
-                    <span class="value-display" id="barCount-value">7</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Bar Width</label>
-                <div class="slider-container">
-                    <input type="range" id="barWidth" min="36" max="100" step="4" value="66" oninput="updateParam('barWidth', parseInt(this.value))">
-                    <span class="value-display" id="barWidth-value">66</span>
+                    <input type="range" id="barCount" min="3" max="9" step="2" value="5" oninput="updateParam('barCount', parseInt(this.value))">
+                    <span class="value-display" id="barCount-value">5</span>
                 </div>
             </div>
 
             <div class="control-group">
                 <label>Max Height</label>
                 <div class="slider-container">
-                    <input type="range" id="maxBarHeight" min="180" max="520" step="20" value="380" oninput="updateParam('maxBarHeight', parseInt(this.value))">
-                    <span class="value-display" id="maxBarHeight-value">380</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Noise Amount</label>
-                <div class="slider-container">
-                    <input type="range" id="noiseAmount" min="0" max="0.5" step="0.02" value="0.18" oninput="updateParam('noiseAmount', parseFloat(this.value))">
-                    <span class="value-display" id="noiseAmount-value">0.18</span>
-                </div>
-            </div>
-
-            <div class="control-group">
-                <label>Glow Intensity</label>
-                <div class="slider-container">
-                    <input type="range" id="glowIntensity" min="0" max="2.5" step="0.1" value="1.0" oninput="updateParam('glowIntensity', parseFloat(this.value))">
-                    <span class="value-display" id="glowIntensity-value">1.0</span>
+                    <input type="range" id="maxBarHeight" min="280" max="640" step="20" value="500" oninput="updateParam('maxBarHeight', parseInt(this.value))">
+                    <span class="value-display" id="maxBarHeight-value">500</span>
                 </div>
             </div>
 
             <div class="control-group">
                 <label>Caret Height</label>
                 <div class="slider-container">
-                    <input type="range" id="caretHeight" min="80" max="320" step="10" value="200" oninput="updateParam('caretHeight', parseInt(this.value))">
-                    <span class="value-display" id="caretHeight-value">200</span>
+                    <input type="range" id="caretHeight" min="160" max="440" step="10" value="300" oninput="updateParam('caretHeight', parseInt(this.value))">
+                    <span class="value-display" id="caretHeight-value">300</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Noise Variation</label>
+                <div class="slider-container">
+                    <input type="range" id="noiseAmount" min="0" max="0.5" step="0.02" value="0.20" oninput="updateParam('noiseAmount', parseFloat(this.value))">
+                    <span class="value-display" id="noiseAmount-value">0.20</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Glow Intensity</label>
+                <div class="slider-container">
+                    <input type="range" id="glowIntensity" min="0" max="2.5" step="0.1" value="1.3" oninput="updateParam('glowIntensity', parseFloat(this.value))">
+                    <span class="value-display" id="glowIntensity-value">1.3</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Accent Hue</label>
+                <div class="slider-container">
+                    <input type="range" id="accentHue" min="0" max="360" step="5" value="180" oninput="updateParam('accentHue', parseInt(this.value))">
+                    <span class="value-display" id="accentHue-value">180°</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Ghost Bars</label>
+                <div class="slider-container">
+                    <input type="range" id="ghostOpacity" min="0" max="0.4" step="0.02" value="0.16" oninput="updateParam('ghostOpacity', parseFloat(this.value))">
+                    <span class="value-display" id="ghostOpacity-value">0.16</span>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>Atmosphere</label>
+                <div class="slider-container">
+                    <input type="range" id="atmosphereDensity" min="0" max="160" step="10" value="80" oninput="updateParam('atmosphereDensity', parseInt(this.value))">
+                    <span class="value-display" id="atmosphereDensity-value">80</span>
                 </div>
             </div>
         </div>
@@ -180,17 +196,17 @@
 </div>
 
 <script>
+    // All sizes are in canvas units (canvas is 1024x1024).
     let params = {
         seed: 42,
-        barCount: 7,
-        barWidth: 66,
-        barSpacing: 16,
-        maxBarHeight: 380,
-        noiseAmount: 0.18,
-        glowIntensity: 1.0,
-        caretHeight: 200,
-        caretSerif: 28,
-        caretWeight: 5
+        barCount: 5,
+        maxBarHeight: 500,
+        caretHeight: 300,
+        noiseAmount: 0.20,
+        glowIntensity: 1.3,
+        accentHue: 180,         // 180 = cyan
+        ghostOpacity: 0.16,
+        atmosphereDensity: 80,
     };
 
     const defaultParams = { ...params };
@@ -205,101 +221,331 @@
         drawIcon();
     }
 
+    // ── Render pipeline ──────────────────────────────────────────
+    // Layered, using the underlying Canvas2D context for gradients
+    // and composite ops that p5 doesn't expose directly.
+
     function drawIcon() {
         randomSeed(params.seed);
         noiseSeed(params.seed);
-        background(11, 17, 32); // deep navy #0B1120
-        drawWaveformBars();
-        drawCaret();
+
+        const ctx = drawingContext;
+        const W = width, H = height;
+        const cx = W / 2, cy = H / 2;
+
+        clear();
+
+        // 1. Squircle clip — macOS-style superellipse (n≈5)
+        ctx.save();
+        squirclePath(ctx, cx, cy, W, 5);
+        ctx.clip();
+
+        // 2. Base diagonal gradient (deep navy → indigo)
+        drawBaseGradient(ctx, W, H);
+
+        // 3. Top-left radial spotlight
+        drawSpotlight(ctx, W, H);
+
+        // 4. Atmosphere (drifting dust)
+        drawAtmosphere(ctx, W, H);
+
+        // 5. Bottom vignette
+        drawVignette(ctx, W, H);
+
+        // 6. Ghost frequency bars (depth, behind main bars)
+        drawGhostBars(ctx, W, H);
+
+        // 7. Main waveform bars (gradient + glow + highlight)
+        drawMainBars(ctx, W, H);
+
+        // 8. Center caret (glowing capsule + serif dots)
+        drawCaret(ctx, W, H);
+
+        // 9. Top gloss highlight
+        drawTopGloss(ctx, W, H);
+
+        ctx.restore();
+
+        // 10. Outer rim highlight (drawn after clip is released)
+        drawRimHighlight(ctx, cx, cy, W);
     }
 
-    function drawWaveformBars() {
-        const n   = params.barCount;
-        const bw  = params.barWidth;
-        const gap = params.barSpacing;
-        const totalW = n * bw + (n - 1) * gap;
-        const startX = (width - totalW) / 2;
-        const cy = height / 2;
-        const maxH = params.maxBarHeight;
+    // ── Squircle (macOS superellipse) ────────────────────────────
 
-        // Build symmetric height array from center outward
-        const halfN = Math.floor(n / 2);
-        const rightSide = [];
+    function squirclePath(ctx, cx, cy, size, n) {
+        const r = size / 2;
+        const segments = 256;
+        ctx.beginPath();
+        for (let i = 0; i <= segments; i++) {
+            const t = (i / segments) * Math.PI * 2;
+            const c = Math.cos(t);
+            const s = Math.sin(t);
+            const x = cx + Math.sign(c) * Math.pow(Math.abs(c), 2 / n) * r;
+            const y = cy + Math.sign(s) * Math.pow(Math.abs(s), 2 / n) * r;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+    }
+
+    // ── Background layers ────────────────────────────────────────
+
+    function drawBaseGradient(ctx, W, H) {
+        const g = ctx.createLinearGradient(0, 0, W, H);
+        g.addColorStop(0,    '#0E1A2E');   // top-left: deep teal-navy
+        g.addColorStop(0.45, '#121431');   // mid: indigo
+        g.addColorStop(1,    '#1E1238');   // bottom-right: violet-navy
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    function drawSpotlight(ctx, W, H) {
+        const g = ctx.createRadialGradient(W * 0.3, H * 0.18, 0, W * 0.3, H * 0.18, W * 0.7);
+        const hue = params.accentHue;
+        g.addColorStop(0, `hsla(${(hue + 30) % 360}, 55%, 55%, 0.32)`);
+        g.addColorStop(1, `hsla(${(hue + 30) % 360}, 55%, 55%, 0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    function drawVignette(ctx, W, H) {
+        const g = ctx.createRadialGradient(W * 0.5, H * 1.0, 0, W * 0.5, H * 1.0, W * 0.85);
+        g.addColorStop(0, 'rgba(0, 0, 8, 0.42)');
+        g.addColorStop(1, 'rgba(0, 0, 8, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    function drawAtmosphere(ctx, W, H) {
+        const n = params.atmosphereDensity;
+        const hue = params.accentHue;
+        for (let i = 0; i < n; i++) {
+            const x = random(W);
+            const y = random(H);
+            const r = random(0.6, 2.4);
+            const a = random(0.05, 0.35);
+            ctx.fillStyle = `hsla(${(hue + 20) % 360}, 70%, 80%, ${a})`;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    function drawTopGloss(ctx, W, H) {
+        const g = ctx.createLinearGradient(0, 0, 0, H * 0.45);
+        g.addColorStop(0, 'rgba(255, 255, 255, 0.10)');
+        g.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H * 0.45);
+    }
+
+    function drawRimHighlight(ctx, cx, cy, W) {
+        ctx.save();
+        squirclePath(ctx, cx, cy, W - 4, 5);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // ── Bar geometry ─────────────────────────────────────────────
+
+    // Returns { startX, bw, gap, heights[] } in canvas units, symmetric.
+    function computeBarLayout(count, totalWidth, maxH) {
+        const bw = totalWidth / (count + (count - 1) * 0.34);
+        const gap = bw * 0.34;
+        const startX = (width - (count * bw + (count - 1) * gap)) / 2;
+
+        const halfN = Math.floor(count / 2);
+        const right = [];
         for (let i = 0; i <= halfN; i++) {
             const t = halfN === 0 ? 1 : 1 - i / halfN;
-            const baseH = maxH * (0.18 + 0.82 * Math.pow(t, 0.62));
-            const nv = noise(i * 0.72, params.seed * 0.013);
+            const baseH = maxH * (0.20 + 0.80 * Math.pow(t, 0.58));
+            const nv = noise(i * 0.72 + 11, params.seed * 0.013);
             const variation = 1 + (nv - 0.5) * params.noiseAmount * 2;
-            rightSide.push(Math.max(maxH * 0.14, baseH * variation));
+            right.push(Math.max(maxH * 0.16, baseH * variation));
         }
-        // Mirror: left = rightSide reversed (skip center), center, right
-        const leftSide = rightSide.slice(1).reverse();
-        const allHeights = [...leftSide, ...rightSide];
+        const left = right.slice(1).reverse();
+        return { startX, bw, gap, heights: [...left, ...right] };
+    }
 
-        for (let i = 0; i < n; i++) {
-            const x = startX + i * (bw + gap);
-            const h = allHeights[i];
-            const cornerR = Math.min(bw * 0.38, 18);
+    // ── Ghost bars (background depth) ────────────────────────────
 
-            // Color: teal at edges → aquamarine toward center
-            const tCenter = 1 - Math.abs(i - (n - 1) / 2) / ((n - 1) / 2 || 1);
-            const r   = lerp(0,   32,  tCenter);
-            const g   = lerp(190, 230, tCenter);
-            const bC  = lerp(222, 172, tCenter);
-
-            // Glow passes (outer → inner)
-            noStroke();
-            for (let gl = 4; gl >= 1; gl--) {
-                const spread = gl * 10;
-                const alpha  = (5 - gl) * 10 * params.glowIntensity;
-                fill(r, g, bC, alpha);
-                rect(x - spread / 2, cy - h / 2 - spread / 2,
-                     bw + spread, h + spread,
-                     cornerR + spread / 2);
+    function drawGhostBars(ctx, W, H) {
+        if (params.ghostOpacity <= 0) return;
+        const cy = H / 2;
+        const n = 17;
+        const totalW = W * 0.78;
+        const layout = (() => {
+            const bw = (totalW / (n + (n - 1) * 0.6)) * 0.6;
+            const gap = bw * 0.6;
+            const startX = (W - (n * bw + (n - 1) * gap)) / 2;
+            const heights = [];
+            const halfN = Math.floor(n / 2);
+            for (let i = 0; i <= halfN; i++) {
+                const t = halfN === 0 ? 1 : 1 - i / halfN;
+                const nv = noise(i * 0.43 + 51, params.seed * 0.017);
+                const baseH = (W * 0.06) + (W * 0.18) * Math.pow(t, 0.7) * (0.5 + nv);
+                heights.push(baseH);
             }
+            const left = heights.slice(1).reverse();
+            return { startX, bw, gap, heights: [...left, ...heights] };
+        })();
 
-            // Bar body
-            fill(r, g, bC, 232);
-            rect(x, cy - h / 2, bw, h, cornerR);
+        const hue = params.accentHue;
+        ctx.save();
+        for (let i = 0; i < n; i++) {
+            const x = layout.startX + i * (layout.bw + layout.gap);
+            const h = layout.heights[i];
+            ctx.fillStyle = `hsla(${hue}, 70%, 70%, ${params.ghostOpacity})`;
+            roundRectFill(ctx, x, cy - h / 2, layout.bw, h, layout.bw / 2);
+        }
+        ctx.restore();
+    }
 
-            // Specular highlight (upper-left)
-            fill(255, 255, 255, 46);
-            rect(x + bw * 0.13, cy - h / 2 + 6,
-                 bw * 0.22, h * 0.28,
-                 cornerR * 0.45);
+    // ── Main waveform bars ───────────────────────────────────────
+
+    function drawMainBars(ctx, W, H) {
+        const cy = H / 2;
+        const n = params.barCount;
+        const layout = computeBarLayout(n, W * 0.62, params.maxBarHeight);
+        const hue = params.accentHue;
+
+        // Outer glow pass (screen blend)
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        for (let pass = 4; pass >= 1; pass--) {
+            const spread = pass * 14;
+            const alpha = (5 - pass) * 0.07 * params.glowIntensity;
+            ctx.fillStyle = `hsla(${hue}, 90%, 60%, ${alpha})`;
+            for (let i = 0; i < n; i++) {
+                const x = layout.startX + i * (layout.bw + layout.gap);
+                const h = layout.heights[i];
+                roundRectFill(ctx,
+                    x - spread / 2, cy - h / 2 - spread / 2,
+                    layout.bw + spread, h + spread,
+                    (layout.bw + spread) / 2);
+            }
+        }
+        ctx.restore();
+
+        // Bar bodies + highlights
+        for (let i = 0; i < n; i++) {
+            const x = layout.startX + i * (layout.bw + layout.gap);
+            const h = layout.heights[i];
+            const tCenter = 1 - Math.abs(i - (n - 1) / 2) / ((n - 1) / 2 || 1);
+
+            // Vertical 3-stop gradient
+            const grad = ctx.createLinearGradient(x, cy - h / 2, x, cy + h / 2);
+            grad.addColorStop(0,   `hsl(${(hue + 18) % 360}, 92%, 92%)`);  // top: pale
+            grad.addColorStop(0.4, `hsl(${hue}, 82%, 62%)`);               // mid: vivid
+            grad.addColorStop(1,   `hsl(${(hue - 12 + 360) % 360}, 92%, 38%)`); // bottom: deep
+            ctx.fillStyle = grad;
+            roundRectFill(ctx, x, cy - h / 2, layout.bw, h, layout.bw / 2);
+
+            // Specular highlight (upper portion, top-left)
+            const hlGrad = ctx.createLinearGradient(x, cy - h / 2, x, cy - h / 2 + h * 0.42);
+            hlGrad.addColorStop(0, `rgba(255, 255, 255, ${0.55 + tCenter * 0.15})`);
+            hlGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = hlGrad;
+            roundRectFill(ctx, x + layout.bw * 0.14, cy - h / 2 + 4,
+                          layout.bw * 0.32, h * 0.42, layout.bw * 0.18);
+
+            // Inner edge stroke (subtle definition)
+            ctx.strokeStyle = `hsla(${hue}, 60%, 30%, 0.35)`;
+            ctx.lineWidth = 1.5;
+            roundRectStroke(ctx, x, cy - h / 2, layout.bw, h, layout.bw / 2);
         }
     }
 
-    function drawCaret() {
-        const cx = width / 2;
-        const cy = height / 2;
+    // ── Caret ────────────────────────────────────────────────────
+
+    function drawCaret(ctx, W, H) {
+        const cx = W / 2;
+        const cy = H / 2;
         const ch = params.caretHeight;
-        const cs = params.caretSerif;
-        const sw = params.caretWeight;
+        const cw = W * 0.018;          // capsule width
+        const dotR = cw * 1.0;
+        const dotOffset = ch / 2 + cw * 1.5;
 
-        // Glow around the caret stem
-        noFill();
-        for (let g = 3; g >= 1; g--) {
-            strokeWeight(sw + g * 5);
-            stroke(255, 255, 255, 16 * (4 - g));
-            line(cx, cy - ch / 2, cx, cy + ch / 2);
+        // Outer glow (screen blend)
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        for (let pass = 4; pass >= 1; pass--) {
+            const spread = pass * 10;
+            const alpha = (5 - pass) * 0.08 * params.glowIntensity;
+            ctx.fillStyle = `rgba(220, 240, 255, ${alpha})`;
+            roundRectFill(ctx,
+                cx - cw / 2 - spread / 2, cy - ch / 2 - spread / 2,
+                cw + spread, ch + spread,
+                (cw + spread) / 2);
+            // Glow around the dots too
+            ctx.beginPath();
+            ctx.arc(cx, cy - dotOffset, dotR + spread / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(cx, cy + dotOffset, dotR + spread / 2, 0, Math.PI * 2);
+            ctx.fill();
         }
+        ctx.restore();
 
-        // Caret proper
-        stroke(255, 255, 255, 242);
-        strokeWeight(sw);
-        line(cx,          cy - ch / 2, cx,          cy + ch / 2); // stem
-        line(cx - cs / 2, cy - ch / 2, cx + cs / 2, cy - ch / 2); // top serif
-        line(cx - cs / 2, cy + ch / 2, cx + cs / 2, cy + ch / 2); // bottom serif
+        // Capsule (vertical white gradient)
+        const grad = ctx.createLinearGradient(cx, cy - ch / 2, cx, cy + ch / 2);
+        grad.addColorStop(0,   'rgba(255, 255, 255, 1)');
+        grad.addColorStop(0.5, 'rgba(232, 248, 255, 1)');
+        grad.addColorStop(1,   'rgba(255, 255, 255, 1)');
+        ctx.fillStyle = grad;
+        roundRectFill(ctx, cx - cw / 2, cy - ch / 2, cw, ch, cw / 2);
+
+        // Serif dots (modern alternative to I-beam serifs)
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+        ctx.beginPath();
+        ctx.arc(cx, cy - dotOffset, dotR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx, cy + dotOffset, dotR, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // ── Round-rect helpers (use native roundRect when available) ─
+
+    function roundRectFill(ctx, x, y, w, h, r) {
+        roundRectPath(ctx, x, y, w, h, r);
+        ctx.fill();
+    }
+
+    function roundRectStroke(ctx, x, y, w, h, r) {
+        roundRectPath(ctx, x, y, w, h, r);
+        ctx.stroke();
+    }
+
+    function roundRectPath(ctx, x, y, w, h, r) {
+        const rr = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(x, y, w, h, rr);
+        } else {
+            ctx.moveTo(x + rr, y);
+            ctx.arcTo(x + w, y,     x + w, y + h, rr);
+            ctx.arcTo(x + w, y + h, x,     y + h, rr);
+            ctx.arcTo(x,     y + h, x,     y,     rr);
+            ctx.arcTo(x,     y,     x + w, y,     rr);
+            ctx.closePath();
+        }
     }
 
     // ── UI handlers ──────────────────────────────────────────────
 
     function updateParam(name, value) {
         params[name] = value;
-        document.getElementById(name + '-value').textContent = value;
+        document.getElementById(name + '-value').textContent = formatValue(name, value);
         redraw();
         drawIcon();
+    }
+
+    function formatValue(name, value) {
+        if (name === 'accentHue') return value + '°';
+        return value;
     }
 
     function updateSeed() {
@@ -328,9 +574,9 @@
 
     function resetParameters() {
         Object.assign(params, defaultParams);
-        ['barCount','barWidth','maxBarHeight','noiseAmount','glowIntensity','caretHeight'].forEach(k => {
+        ['barCount','maxBarHeight','caretHeight','noiseAmount','glowIntensity','accentHue','ghostOpacity','atmosphereDensity'].forEach(k => {
             document.getElementById(k).value = params[k];
-            document.getElementById(k + '-value').textContent = params[k];
+            document.getElementById(k + '-value').textContent = formatValue(k, params[k]);
         });
         document.getElementById('seed-input').value = params.seed;
         redraw(); drawIcon();
