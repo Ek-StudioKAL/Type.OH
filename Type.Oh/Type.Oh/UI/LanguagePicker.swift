@@ -1,5 +1,4 @@
 import SwiftUI
-import Translation
 
 struct LanguagePicker: View {
     @Binding var sourceLanguage: Locale.Language?
@@ -27,13 +26,28 @@ struct LanguagePicker: View {
                 if let lang { targetLanguage = lang }
             }
         }
-        .task { supported = await LanguageAvailability().supportedLanguages }
+        .task { supported = availableLanguages() }
     }
 
     // MARK: - Helpers
 
     private func displayName(_ lang: Locale.Language) -> String {
         Locale.current.localizedString(forIdentifier: lang.minimalIdentifier) ?? lang.minimalIdentifier
+    }
+
+    private func availableLanguages() -> [Locale.Language] {
+        var seen = Set<String>()
+        return Locale.availableIdentifiers
+            .compactMap { identifier -> Locale.Language? in
+                let language = Locale.Language(identifier: identifier)
+                let minimal = language.minimalIdentifier
+                guard !minimal.isEmpty else { return nil }
+                guard seen.insert(minimal).inserted else { return nil }
+                return Locale.Language(identifier: minimal)
+            }
+            .sorted {
+                displayName($0).localizedCaseInsensitiveCompare(displayName($1)) == .orderedAscending
+            }
     }
 
     @ViewBuilder

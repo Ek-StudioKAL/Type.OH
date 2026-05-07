@@ -13,6 +13,10 @@ struct OpenAIProvider: TextAIProvider {
         return try await complete(textAIPrompt(fragment: preset.promptFragment, text: text, emojify: emojify))
     }
 
+    func translate(text: String, sourceLanguage: String?, targetLanguage: String) async throws -> String {
+        try await complete(translationPrompt(text: text, sourceLanguage: sourceLanguage, targetLanguage: targetLanguage))
+    }
+
     private func complete(_ prompt: String) async throws -> String {
         guard !apiKey.isEmpty else { throw ProviderError.missingAPIKey }
 

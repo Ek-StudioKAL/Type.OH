@@ -11,12 +11,19 @@ struct OnboardingWizard: View {
 
     @State private var step: Step = .welcome
     @State private var manager = ModelManager.shared
+    @State private var voiceHotkeyDraft = HotkeyConfig.defaultVoice
+    @State private var editorHotkeyDraft = HotkeyConfig.defaultEditor
+    @State private var scratchpadHotkeyDraft: HotkeyConfig? = nil
+    @State private var hotkeyError: String?
+    @State private var loadedHotkeyDrafts = false
 
     enum Step: Int, CaseIterable {
         case welcome
         case appleIntelligence
         case permissions
+        case hotkeys
         case model
+        case keychainNotice
         case provider
         case summary
 
@@ -25,7 +32,9 @@ struct OnboardingWizard: View {
             case .welcome:           "Welcome to Type.OH"
             case .appleIntelligence: "Apple Intelligence"
             case .permissions:       "Permissions"
+            case .hotkeys:           "Hotkeys"
             case .model:             "Voice Model"
+            case .keychainNotice:    "Secure Key Storage"
             case .provider:          "AI Provider"
             case .summary:           "All Set"
             }
@@ -59,7 +68,14 @@ struct OnboardingWizard: View {
                     case .welcome:           WelcomeStep()
                     case .appleIntelligence: AppleIntelligenceStep()
                     case .permissions:       PermissionsStep()
+                    case .hotkeys:           HotkeysStep(
+                        voiceHotkey: $voiceHotkeyDraft,
+                        editorHotkey: $editorHotkeyDraft,
+                        scratchpadHotkey: $scratchpadHotkeyDraft,
+                        errorMessage: $hotkeyError
+                    )
                     case .model:             ModelStep(manager: $manager)
+                    case .keychainNotice:    KeychainNoticeStep()
                     case .provider:          ProviderStep()
                     case .summary:           SummaryStep(manager: manager)
                     }
@@ -92,6 +108,7 @@ struct OnboardingWizard: View {
             .padding(20)
         }
         .frame(width: 560, height: 540)
+        .onAppear { loadHotkeyDraftsIfNeeded() }
     }
 
     private var progress: Double {
@@ -100,6 +117,9 @@ struct OnboardingWizard: View {
     }
 
     private func goNext() {
+        if step == .hotkeys, !saveHotkeys() {
+            return
+        }
         if let next = Step(rawValue: step.rawValue + 1) {
             step = next
         }
@@ -112,9 +132,39 @@ struct OnboardingWizard: View {
     }
 
     private func finish() {
+        if step == .summary {
+            _ = saveHotkeys()
+        }
         settings.hasCompletedOnboarding = true
         settings.save()
         onFinish()
+    }
+
+    private func loadHotkeyDraftsIfNeeded() {
+        guard !loadedHotkeyDrafts else { return }
+        voiceHotkeyDraft = settings.voiceHotkey
+        editorHotkeyDraft = settings.editorHotkey
+        scratchpadHotkeyDraft = settings.scratchpadHotkey
+        loadedHotkeyDrafts = true
+    }
+
+    private func saveHotkeys() -> Bool {
+        if let error = validateHotkeys(
+            voice: voiceHotkeyDraft,
+            editor: editorHotkeyDraft,
+            scratchpad: scratchpadHotkeyDraft
+        ) {
+            hotkeyError = error
+            return false
+        }
+
+        hotkeyError = nil
+        settings.voiceHotkey = voiceHotkeyDraft
+        settings.editorHotkey = editorHotkeyDraft
+        settings.scratchpadHotkey = scratchpadHotkeyDraft
+        settings.save()
+        NotificationCenter.default.post(name: NSNotification.Name("typeoh.hotkeysChanged"), object: nil)
+        return true
     }
 }
 
@@ -188,10 +238,11 @@ private struct WelcomeStep: View {
 private struct AppleIntelligenceStep: View {
     @State private var status: String = ""
     @State private var available: Bool = false
+    @State private var detail: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Type.OH's default AI provider runs entirely on-device using Apple Intelligence.")
+            Text("Type.OH can use Apple Intelligence as its default on-device AI provider when this Mac and OS support it.")
 
             HStack(spacing: 8) {
                 Image(systemName: available ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
@@ -202,19 +253,21 @@ private struct AppleIntelligenceStep: View {
             .padding(.vertical, 4)
 
             if !available {
-                Text("Apple Intelligence requires macOS 26 on Apple Silicon and must be enabled in System Settings → Apple Intelligence & Siri.")
+                Text(detail)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Button("Open Apple Intelligence Settings") {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.appleintelligence") {
-                        NSWorkspace.shared.open(url)
+                if #available(macOS 26.0, *) {
+                    Button("Open Apple Intelligence Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.appleintelligence") {
+                            NSWorkspace.shared.open(url)
+                        }
                     }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
 
-                Text("You can still skip this and pick a cloud provider (Anthropic / OpenAI / Google) on the next steps.")
+                Text("Type.OH will still work on this Mac with an external AI provider such as Anthropic, OpenAI, or Google. You can choose that in the next steps.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.top, 4)
@@ -228,13 +281,21 @@ private struct AppleIntelligenceStep: View {
     }
 
     private func refresh() {
-        let availability = SystemLanguageModel.default.availability
-        if case .available = availability {
-            available = true
-            status = "Apple Intelligence is available"
+        if #available(macOS 26.0, *) {
+            let availability = SystemLanguageModel.default.availability
+            if case .available = availability {
+                available = true
+                status = "Apple Intelligence is available"
+                detail = ""
+            } else {
+                available = false
+                status = "Apple Intelligence is unavailable on this Mac"
+                detail = "Apple Intelligence requires supported hardware, a supported macOS version, and must be enabled in System Settings → Apple Intelligence & Siri."
+            }
         } else {
             available = false
-            status = "Not available — \(String(describing: availability))"
+            status = "Apple Intelligence is not supported on this macOS version"
+            detail = "This Mac is running an earlier macOS release. Type.OH can still use an external AI provider instead."
         }
     }
 }
@@ -368,7 +429,35 @@ private struct PermissionsStep: View {
     }
 }
 
-// MARK: - Step 4: Whisper model download
+// MARK: - Step 4: Hotkeys
+
+private struct HotkeysStep: View {
+    @Binding var voiceHotkey: HotkeyConfig
+    @Binding var editorHotkey: HotkeyConfig
+    @Binding var scratchpadHotkey: HotkeyConfig?
+    @Binding var errorMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Choose the shortcuts Type.OH should register globally. Voice and AI Editor are required. LazyPad is optional.")
+                .fixedSize(horizontal: false, vertical: true)
+
+            HotkeyConfigurationEditor(
+                voiceHotkey: $voiceHotkey,
+                editorHotkey: $editorHotkey,
+                scratchpadHotkey: $scratchpadHotkey
+            )
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+}
+
+// MARK: - Step 5: Whisper model download
 
 private struct ModelStep: View {
     @Environment(SettingsStore.self) private var settings
@@ -447,7 +536,26 @@ private struct ModelStep: View {
     }
 }
 
-// MARK: - Step 5: Provider / API key
+// MARK: - Step 6: Keychain Notice
+
+private struct KeychainNoticeStep: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Type.OH stores provider API keys securely in your macOS Keychain.")
+                .font(.body.weight(.medium))
+
+            Text("Your keys remain in your personal Keychain and are not transmitted to the Type.OH developers. They are only used locally on your Mac to authenticate requests directly to the provider you choose.")
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("On the next step, macOS may ask for your password or Touch ID to authorize secure Keychain access when you save a provider key.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+// MARK: - Step 7: Provider / API key
 
 private struct ProviderStep: View {
     @Environment(SettingsStore.self) private var settings
@@ -525,7 +633,7 @@ private struct ProviderStep: View {
     }
 }
 
-// MARK: - Step 6: Summary
+// MARK: - Step 8: Summary
 
 private struct SummaryStep: View {
     @Environment(SettingsStore.self) private var settings
@@ -538,15 +646,19 @@ private struct SummaryStep: View {
 
             summaryRow(label: "Voice model", value: voiceModelLabel)
             summaryRow(label: "AI provider", value: settings.activeProvider.displayName)
-            summaryRow(label: "Voice hotkey", value: "⌃F13")
-            summaryRow(label: "Editor hotkey", value: "⌥F13")
+            summaryRow(label: "Voice hotkey", value: settings.voiceHotkey.displayString)
+            summaryRow(label: "Editor hotkey", value: settings.editorHotkey.displayString)
+            summaryRow(label: "LazyPad hotkey", value: settings.scratchpadHotkey?.displayString ?? "Not set")
 
             Divider().padding(.vertical, 6)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Next steps").font(.body.weight(.medium))
-                Text("• Press ⌃F13 anywhere to dictate.")
-                Text("• Select text and press ⌥F13 to fix, restyle, or translate it.")
+                Text("• Press \(settings.voiceHotkey.displayString) anywhere to dictate.")
+                Text("• Select text and press \(settings.editorHotkey.displayString) to fix, restyle, or translate it.")
+                if let scratchpadHotkey = settings.scratchpadHotkey {
+                    Text("• Press \(scratchpadHotkey.displayString) to open LazyPad.")
+                }
                 Text("• Type.OH lives in your menu bar — click the waveform icon for Settings.")
             }
             .font(.callout)

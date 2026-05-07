@@ -13,19 +13,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var selectionReader  = SelectionReader()
     private      let audioRecorder    = AudioRecorder()
     private      let whisperService   = WhisperService()
+    private      let scratchpadStore  = ScratchpadStore()
 
     private var recordingPanel:  NSPanel?
     private var editorPanel:     NSPanel?
     private var onboardingPanel: NSPanel?
+    private var scratchpadPanelController: ScratchpadPanelController?
 
     // MARK: - App lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(settingsStore.showInDock ? .regular : .accessory)
+        if let appIcon = NSImage(named: NSImage.applicationIconName) {
+            NSApp.applicationIconImage = appIcon
+        }
 
         HotkeyManager.shared.onVoiceHotkey  = { [weak self] in Task { @MainActor in await self?.handleVoiceKey()  } }
         HotkeyManager.shared.onEditorHotkey = { [weak self] in Task { @MainActor in await self?.handleEditorKey() } }
-        HotkeyManager.shared.register(voice: settingsStore.voiceHotkey, editor: settingsStore.editorHotkey)
+        HotkeyManager.shared.onScratchpadHotkey = { [weak self] in Task { @MainActor in self?.openScratchpad() } }
+        applyHotkeys()
 
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showAbout"), object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.showAboutPanel() }
@@ -38,6 +44,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showOnboarding"), object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.showOnboarding() }
+        }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.openScratchpad"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.openScratchpad() }
+        }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.hotkeysChanged"), object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.applyHotkeys() }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.openSettings"), object: nil, queue: .main) { _ in
             Task { @MainActor in
@@ -71,6 +83,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
             AXIsProcessTrustedWithOptions(opts)
         }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        openScratchpad()
+        return true
     }
 
     // MARK: - Voice flow
@@ -190,6 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let content = OnboardingWizard(onFinish: { [weak self] in
             self?.onboardingPanel?.close()
             self?.onboardingPanel = nil
+            self?.openScratchpad()
         })
         .environment(settingsStore)
 
@@ -201,6 +219,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.center()
         bringPanelFront(panel)
         onboardingPanel = panel
+    }
+
+    func openScratchpad() {
+        focusCapture.capture()
+
+        if scratchpadPanelController == nil {
+            scratchpadPanelController = ScratchpadPanelController(
+                settingsStore: settingsStore,
+                pasteService: pasteService,
+                store: scratchpadStore
+            )
+        }
+
+        scratchpadPanelController?.show(using: settingsStore)
     }
 
     // MARK: - Helpers
@@ -240,5 +272,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showBannerError(_ message: String) {
         NSLog("[Type.OH] Error: %@", message)
         ToastOverlay.shared.show(message)
+    }
+
+    private func applyHotkeys() {
+        HotkeyManager.shared.register(
+            voice: settingsStore.voiceHotkey,
+            editor: settingsStore.editorHotkey,
+            scratchpad: settingsStore.scratchpadHotkey
+        )
     }
 }

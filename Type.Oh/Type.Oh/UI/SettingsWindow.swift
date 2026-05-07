@@ -13,7 +13,7 @@ struct SettingsWindow: View {
             ModelsTab()
                 .tabItem { Label("Models", systemImage: "waveform") }
         }
-        .frame(width: 480, height: 460)
+        .frame(width: 520, height: 620)
     }
 }
 
@@ -21,14 +21,38 @@ struct SettingsWindow: View {
 
 private struct GeneralTab: View {
     @Environment(SettingsStore.self) private var settings
+    @State private var voiceHotkeyDraft = HotkeyConfig.defaultVoice
+    @State private var editorHotkeyDraft = HotkeyConfig.defaultEditor
+    @State private var scratchpadHotkeyDraft: HotkeyConfig? = nil
+    @State private var hotkeyError: String?
 
     var body: some View {
         @Bindable var settings = settings
         Form {
             Section("Hotkeys") {
-                hotkeyRow("Voice recording", symbol: "⌃F13")
-                hotkeyRow("AI Editor",        symbol: "⌥F13")
-                Text("Hotkey reconfiguration coming in a future update.")
+                HotkeyConfigurationEditor(
+                    voiceHotkey: $voiceHotkeyDraft,
+                    editorHotkey: $editorHotkeyDraft,
+                    scratchpadHotkey: $scratchpadHotkeyDraft
+                )
+                if let hotkeyError {
+                    Text(hotkeyError)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                HStack {
+                    Button("Save Hotkeys") {
+                        saveHotkeys()
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button("Reset Defaults") {
+                        resetHotkeysToDefaults()
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.top, 4)
+                Text("Changes take effect as soon as you save them.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -53,20 +77,43 @@ private struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .padding()
-    }
-
-    @ViewBuilder
-    private func hotkeyRow(_ label: String, symbol: String) -> some View {
-        LabeledContent(label) {
-            Text(symbol)
-                .font(.system(.body, design: .monospaced))
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Color.secondary.opacity(0.13), in: RoundedRectangle(cornerRadius: 4))
-        }
+        .onAppear { syncHotkeyDraftsFromSettings() }
     }
 
     private func toggleLoginItem(_ enabled: Bool) {
         try? enabled ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
+    }
+
+    private func syncHotkeyDraftsFromSettings() {
+        voiceHotkeyDraft = settings.voiceHotkey
+        editorHotkeyDraft = settings.editorHotkey
+        scratchpadHotkeyDraft = settings.scratchpadHotkey
+    }
+
+    private func saveHotkeys() {
+        if let error = validateHotkeys(
+            voice: voiceHotkeyDraft,
+            editor: editorHotkeyDraft,
+            scratchpad: scratchpadHotkeyDraft
+        ) {
+            hotkeyError = error
+            return
+        }
+
+        hotkeyError = nil
+        settings.voiceHotkey = voiceHotkeyDraft
+        settings.editorHotkey = editorHotkeyDraft
+        settings.scratchpadHotkey = scratchpadHotkeyDraft
+        settings.save()
+        NotificationCenter.default.post(name: NSNotification.Name("typeoh.hotkeysChanged"), object: nil)
+    }
+
+    private func resetHotkeysToDefaults() {
+        voiceHotkeyDraft = .defaultVoice
+        editorHotkeyDraft = .defaultEditor
+        scratchpadHotkeyDraft = nil
+        hotkeyError = nil
+        saveHotkeys()
     }
 }
 

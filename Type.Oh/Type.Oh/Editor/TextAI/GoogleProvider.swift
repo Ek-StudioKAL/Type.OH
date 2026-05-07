@@ -2,7 +2,7 @@ import Foundation
 
 struct GoogleProvider: TextAIProvider {
     let apiKey: String
-    private let model = "gemini-1.5-flash"
+    private let model = "gemini-2.5-flash-lite"
 
     func fix(text: String, emojify: Bool) async throws -> String {
         let fragment = "Fix all typos, grammar mistakes, and punctuation errors in the following text. Preserve the original meaning and tone exactly."
@@ -11,6 +11,10 @@ struct GoogleProvider: TextAIProvider {
 
     func applyStyle(_ preset: StylePreset, to text: String, emojify: Bool) async throws -> String {
         return try await complete(textAIPrompt(fragment: preset.promptFragment, text: text, emojify: emojify))
+    }
+
+    func translate(text: String, sourceLanguage: String?, targetLanguage: String) async throws -> String {
+        try await complete(translationPrompt(text: text, sourceLanguage: sourceLanguage, targetLanguage: targetLanguage))
     }
 
     private func complete(_ prompt: String) async throws -> String {

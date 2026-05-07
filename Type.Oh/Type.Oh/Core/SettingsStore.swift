@@ -35,12 +35,16 @@ final class SettingsStore {
     var whisperModel:    String        = "openai_whisper-base"
     var voiceHotkey:     HotkeyConfig  = .defaultVoice
     var editorHotkey:    HotkeyConfig  = .defaultEditor
+    var scratchpadHotkey: HotkeyConfig? = nil
     var activeProvider:  ProviderID    = .appleOnDevice
     var sourceLanguage:  String?       = nil     // nil = auto-detect
     var targetLanguage:  String        = "en"
     var emojify:         Bool          = false
+    var spellingAssistanceEnabled: Bool = true
+    var grammarAssistanceEnabled: Bool = true
+    var textReplacementEnabled: Bool   = true
     var launchAtLogin:   Bool          = false
-    var showInDock:      Bool          = false
+    var showInDock:      Bool          = true
     var hasCompletedOnboarding: Bool   = false
 
     private let fileURL: URL
@@ -74,8 +78,13 @@ private extension SettingsStore {
         var whisperModel, targetLanguage: String
         var sourceLanguage: String?
         var voiceHotkey, editorHotkey: HotkeyConfig
+        var scratchpadHotkey: HotkeyConfig?
         var activeProvider: ProviderID
         var emojify, launchAtLogin: Bool
+        var spellingAssistanceEnabled: Bool?
+        var grammarAssistanceEnabled: Bool?
+        var textReplacementEnabled: Bool?
+        var smartTextEnabled: Bool?
         var showInDock: Bool?
         var hasCompletedOnboarding: Bool?
 
@@ -83,10 +92,15 @@ private extension SettingsStore {
             whisperModel   = s.whisperModel
             voiceHotkey    = s.voiceHotkey
             editorHotkey   = s.editorHotkey
+            scratchpadHotkey = s.scratchpadHotkey
             activeProvider = s.activeProvider
             sourceLanguage = s.sourceLanguage
             targetLanguage = s.targetLanguage
             emojify        = s.emojify
+            spellingAssistanceEnabled = s.spellingAssistanceEnabled
+            grammarAssistanceEnabled = s.grammarAssistanceEnabled
+            textReplacementEnabled = s.textReplacementEnabled
+            smartTextEnabled = nil
             launchAtLogin  = s.launchAtLogin
             showInDock     = s.showInDock
             hasCompletedOnboarding = s.hasCompletedOnboarding
@@ -96,12 +110,23 @@ private extension SettingsStore {
             s.whisperModel   = whisperModel
             s.voiceHotkey    = voiceHotkey
             s.editorHotkey   = editorHotkey
+            s.scratchpadHotkey = scratchpadHotkey
             s.activeProvider = activeProvider
             s.sourceLanguage = sourceLanguage
             s.targetLanguage = targetLanguage
             s.emojify        = emojify
+            if let spellingAssistanceEnabled, let grammarAssistanceEnabled, let textReplacementEnabled {
+                s.spellingAssistanceEnabled = spellingAssistanceEnabled
+                s.grammarAssistanceEnabled = grammarAssistanceEnabled
+                s.textReplacementEnabled = textReplacementEnabled
+            } else {
+                let legacyValue = smartTextEnabled ?? true
+                s.spellingAssistanceEnabled = legacyValue
+                s.grammarAssistanceEnabled = legacyValue
+                s.textReplacementEnabled = legacyValue
+            }
             s.launchAtLogin  = launchAtLogin
-            s.showInDock     = showInDock ?? false
+            s.showInDock     = showInDock ?? true
             s.hasCompletedOnboarding = hasCompletedOnboarding ?? false
         }
     }

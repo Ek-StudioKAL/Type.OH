@@ -3,6 +3,7 @@ import Foundation
 protocol TextAIProvider: Sendable {
     func fix(text: String, emojify: Bool) async throws -> String
     func applyStyle(_ preset: StylePreset, to text: String, emojify: Bool) async throws -> String
+    func translate(text: String, sourceLanguage: String?, targetLanguage: String) async throws -> String
 }
 
 enum ProviderError: Error, LocalizedError {
@@ -25,8 +26,22 @@ enum ProviderError: Error, LocalizedError {
 // Shared prompt builder used by every provider.
 func textAIPrompt(fragment: String, text: String, emojify: Bool) -> String {
     var prompt = "\(fragment)\n\nText:\n\(text)"
+    prompt += "\n\nPreserve the original input language unless the user explicitly asks for translation. Do not switch languages."
     if emojify { prompt += "\n\nSprinkle in relevant emojis throughout the response." }
     prompt += "\n\nReturn only the rewritten text, nothing else."
+    return prompt
+}
+
+func translationPrompt(text: String, sourceLanguage: String?, targetLanguage: String) -> String {
+    var prompt = "Translate the following text into \(targetLanguage)."
+    if let sourceLanguage, !sourceLanguage.isEmpty {
+        prompt += " The source language is \(sourceLanguage)."
+    } else {
+        prompt += " Detect the source language automatically."
+    }
+    prompt += " Preserve the original meaning, tone, paragraph breaks, and formatting where possible."
+    prompt += "\n\nText:\n\(text)"
+    prompt += "\n\nReturn only the translated text, nothing else."
     return prompt
 }
 

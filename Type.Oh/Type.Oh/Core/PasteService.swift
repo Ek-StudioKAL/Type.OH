@@ -4,6 +4,10 @@ import AppKit
 final class PasteService {
     private let focusCapture: FocusCapture
 
+    var hasCapturedTarget: Bool {
+        focusCapture.capturedApp != nil
+    }
+
     init(focusCapture: FocusCapture) {
         self.focusCapture = focusCapture
     }

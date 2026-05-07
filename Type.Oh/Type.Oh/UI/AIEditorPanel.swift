@@ -1,7 +1,6 @@
 import AppKit
 import ApplicationServices
 import SwiftUI
-import Translation
 
 struct AIEditorPanel: View {
     @Environment(SettingsStore.self) private var settings
@@ -19,13 +18,9 @@ struct AIEditorPanel: View {
     @State private var isProcessing = false
     @State private var errorMessage: String?
 
-    // Translation state
     @State private var sourceLanguage: Locale.Language? = nil
     @State private var targetLanguage  = Locale.Language(identifier: "en")
-    @State private var translationConfig: TranslationSession.Configuration?
-    @State private var prepConfig: TranslationSession.Configuration?
-    @State private var prevSourceLang:  Locale.Language?
-    @State private var prevTargetLang   = Locale.Language(identifier: "en")
+    @State private var hasLoadedTranslationSettings = false
 
     init(originalText: String, isSticky: Bool = false, onApply: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
         self.originalText = originalText
@@ -43,7 +38,6 @@ struct AIEditorPanel: View {
                 .onChange(of: mode) {
                     result = ""
                     errorMessage = nil
-                    if mode == .translate { triggerPrepare() }
                 }
 
             // Mode-specific controls
@@ -51,8 +45,8 @@ struct AIEditorPanel: View {
                 StyleChipRow(selected: $selectedStyle)
             } else if mode == .translate {
                 LanguagePicker(sourceLanguage: $sourceLanguage, targetLanguage: $targetLanguage)
-                    .onChange(of: sourceLanguage) { triggerPrepare() }
-                    .onChange(of: targetLanguage) { triggerPrepare() }
+                    .onChange(of: sourceLanguage) { persistTranslationSettings() }
+                    .onChange(of: targetLanguage) { persistTranslationSettings() }
             }
 
             // Input area with Paste fallback
@@ -177,43 +171,10 @@ struct AIEditorPanel: View {
         }
         .padding(20)
         .frame(minWidth: 460, idealWidth: 520, maxWidth: 900)
-        // Fires language-pack download sheet immediately on language selection without translating.
-        .translationTask(prepConfig) { session in
-            try? await session.prepareTranslation()
-        }
-        // Translation is handled via this modifier; triggered by setting/invalidating translationConfig.
-        .translationTask(translationConfig) { session in
-            do {
-                let response = try await session.translate(editableInput)
-                await MainActor.run {
-                    result = response.targetText
-                    isProcessing = false
-                }
-            } catch {
-                await MainActor.run {
-                    let msg = error.localizedDescription
-                    if msg.localizedCaseInsensitiveContains("unsupported") {
-                        errorMessage = "Auto-detect isn't supported for this pair — select a source language manually."
-                    } else if msg.localizedCaseInsensitiveContains("same") || msg.localizedCaseInsensitiveContains("identical") {
-                        errorMessage = "Source and target language are the same."
-                    } else {
-                        errorMessage = "Translation failed — make sure the language pack is downloaded in System Settings → Language & Region."
-                    }
-                    isProcessing = false
-                }
-            }
-        }
+        .onAppear { loadTranslationSettingsIfNeeded() }
     }
 
     // MARK: - Helpers
-
-    private func triggerPrepare() {
-        guard mode == .translate else { return }
-        // prepareTranslation() requires an explicit source — auto-detect (nil) needs text for LID.
-        guard let src = sourceLanguage else { return }
-        guard src.languageCode != targetLanguage.languageCode else { return }
-        prepConfig = TranslationSession.Configuration(source: src, target: targetLanguage)
-    }
 
     private var actionLabel: String {
         switch mode {
@@ -228,27 +189,27 @@ struct AIEditorPanel: View {
         result       = ""
         isProcessing = true
 
+        let provider = ProviderRegistry.provider(for: settings.activeProvider)
+
         if mode == .translate {
-            // Guard: source and target must differ when source is explicit
-            if let src = sourceLanguage,
-               src.languageCode == targetLanguage.languageCode {
+            if let src = sourceLanguage, src.languageCode == targetLanguage.languageCode {
                 errorMessage = "Source and target language are the same — pick a different target."
                 isProcessing = false
                 return
             }
-            let langChanged = sourceLanguage != prevSourceLang || targetLanguage != prevTargetLang
-            if translationConfig == nil || langChanged {
-                translationConfig = TranslationSession.Configuration(source: sourceLanguage, target: targetLanguage)
-                prevSourceLang = sourceLanguage
-                prevTargetLang = targetLanguage
-            } else {
-                translationConfig?.invalidate()
+            do {
+                result = try await provider.translate(
+                    text: editableInput,
+                    sourceLanguage: sourceLanguage.map(displayName),
+                    targetLanguage: displayName(targetLanguage)
+                )
+            } catch {
+                errorMessage = error.localizedDescription
             }
-            return // translationTask modifier handles completion
-        }
-
-        let provider = ProviderRegistry.provider(for: settings.activeProvider)
-        do {
+            isProcessing = false
+            return
+        } else {
+            do {
             switch mode {
             case .style:
                 guard let preset = selectedStyle else {
@@ -262,10 +223,28 @@ struct AIEditorPanel: View {
             case .translate:
                 break
             }
-        } catch {
-            errorMessage = error.localizedDescription
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
         isProcessing = false
+    }
+
+    private func loadTranslationSettingsIfNeeded() {
+        guard !hasLoadedTranslationSettings else { return }
+        sourceLanguage = settings.sourceLanguage.map(Locale.Language.init(identifier:))
+        targetLanguage = Locale.Language(identifier: settings.targetLanguage)
+        hasLoadedTranslationSettings = true
+    }
+
+    private func persistTranslationSettings() {
+        settings.sourceLanguage = sourceLanguage?.minimalIdentifier
+        settings.targetLanguage = targetLanguage.minimalIdentifier
+        settings.save()
+    }
+
+    private func displayName(_ lang: Locale.Language) -> String {
+        Locale.current.localizedString(forIdentifier: lang.minimalIdentifier) ?? lang.minimalIdentifier
     }
 }
 

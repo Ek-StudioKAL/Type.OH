@@ -14,6 +14,11 @@ struct AppleOnDeviceProvider: TextAIProvider {
         return try await generate(prompt: textAIPrompt(fragment: preset.promptFragment, text: text, emojify: emojify))
     }
 
+    func translate(text: String, sourceLanguage: String?, targetLanguage: String) async throws -> String {
+        try checkAvailability()
+        return try await generate(prompt: translationPrompt(text: text, sourceLanguage: sourceLanguage, targetLanguage: targetLanguage))
+    }
+
     private func generate(prompt: String) async throws -> String {
         let session  = LanguageModelSession()
         let response = try await session.respond(to: prompt)

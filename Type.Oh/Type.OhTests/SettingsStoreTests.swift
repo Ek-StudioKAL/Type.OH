@@ -30,6 +30,10 @@ struct SettingsStoreTests {
         #expect(freshStore().hasCompletedOnboarding == false)
     }
 
+    @Test func defaultScratchpadHotkeyIsDisabled() {
+        #expect(freshStore().scratchpadHotkey == nil)
+    }
+
     // MARK: - Hotkey defaults
 
     @Test func defaultVoiceHotkeyIsCtrlF13() {

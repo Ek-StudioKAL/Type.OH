@@ -5,7 +5,11 @@ final class FocusCapture {
     private(set) var capturedApp: NSRunningApplication?
 
     func capture() {
-        capturedApp = NSWorkspace.shared.frontmostApplication
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else { return }
+        if frontmostApp.bundleIdentifier == Bundle.main.bundleIdentifier {
+            return
+        }
+        capturedApp = frontmostApp
     }
 
     func restore() {
