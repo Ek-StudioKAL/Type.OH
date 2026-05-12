@@ -40,7 +40,7 @@ struct OpenAIProvider: TextAIProvider {
         }
 
         let json = try JSONDecoder().decode(Response.self, from: data)
-        return json.choices.first?.message.content ?? ""
+        return cleanTextAIOutput(json.choices.first?.message.content ?? "")
     }
 
     private struct APIErrorResponse: Decodable {

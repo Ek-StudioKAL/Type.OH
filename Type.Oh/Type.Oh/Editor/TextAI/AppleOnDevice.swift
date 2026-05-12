@@ -22,7 +22,7 @@ struct AppleOnDeviceProvider: TextAIProvider {
     private func generate(prompt: String) async throws -> String {
         let session  = LanguageModelSession()
         let response = try await session.respond(to: prompt)
-        return response.content
+        return cleanTextAIOutput(response.content)
     }
 
     private func checkAvailability() throws {

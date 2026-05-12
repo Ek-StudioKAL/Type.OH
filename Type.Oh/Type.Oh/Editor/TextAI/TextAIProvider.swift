@@ -26,9 +26,9 @@ enum ProviderError: Error, LocalizedError {
 // Shared prompt builder used by every provider.
 func textAIPrompt(fragment: String, text: String, emojify: Bool) -> String {
     var prompt = "\(fragment)\n\nText:\n\(text)"
-    prompt += "\n\nPreserve the original input language unless the user explicitly asks for translation. Do not switch languages."
+    prompt += "\n\nKeep the response in the same language as the input."
     if emojify { prompt += "\n\nSprinkle in relevant emojis throughout the response." }
-    prompt += "\n\nReturn only the rewritten text, nothing else."
+    prompt += "\n\nReturn only the rewritten text. Do not include explanations, notes, policies, or quoted instructions."
     return prompt
 }
 
@@ -43,6 +43,26 @@ func translationPrompt(text: String, sourceLanguage: String?, targetLanguage: St
     prompt += "\n\nText:\n\(text)"
     prompt += "\n\nReturn only the translated text, nothing else."
     return prompt
+}
+
+func cleanTextAIOutput(_ output: String) -> String {
+    let bannedLines = Set([
+        "The original input language will remain unchanged unless the user specifically requests a translation. No language switching is allowed.",
+        "Preserve the original input language unless the user explicitly asks for translation. Do not switch languages.",
+        "Keep the response in the same language as the input."
+    ])
+
+    let cleanedLines = output
+        .split(separator: "\n", omittingEmptySubsequences: false)
+        .map(String.init)
+        .filter { line in
+            let normalized = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !bannedLines.contains(normalized)
+        }
+
+    return cleanedLines
+        .joined(separator: "\n")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
 @MainActor

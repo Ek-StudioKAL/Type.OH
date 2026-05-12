@@ -39,7 +39,7 @@ struct GoogleProvider: TextAIProvider {
         }
 
         let json = try JSONDecoder().decode(Response.self, from: data)
-        return json.candidates.first?.content.parts.first?.text ?? ""
+        return cleanTextAIOutput(json.candidates.first?.content.parts.first?.text ?? "")
     }
 
     private struct APIErrorResponse: Decodable {

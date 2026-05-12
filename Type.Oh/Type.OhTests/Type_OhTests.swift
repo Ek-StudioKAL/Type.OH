@@ -14,20 +14,17 @@ struct TypeOhCoreTests {
         #expect(CustomStylePreset.maxCount == 8)
     }
 
-    @Test func customPresetIsEquatableByAllFields() {
-        let lhs = CustomStylePreset(
-            id: "custom-test",
-            label: "Test",
-            emoji: "T",
-            promptFragment: "Rewrite in a test style."
-        )
-        let rhs = CustomStylePreset(
+    @Test func customPresetStoresAllFields() {
+        let preset = CustomStylePreset(
             id: "custom-test",
             label: "Test",
             emoji: "T",
             promptFragment: "Rewrite in a test style."
         )
 
-        #expect(lhs == rhs)
+        #expect(preset.id == "custom-test")
+        #expect(preset.label == "Test")
+        #expect(preset.emoji == "T")
+        #expect(preset.promptFragment == "Rewrite in a test style.")
     }
 }

@@ -42,7 +42,7 @@ struct AnthropicProvider: TextAIProvider {
         }
 
         let json = try JSONDecoder().decode(Response.self, from: data)
-        return json.content.first?.text ?? ""
+        return cleanTextAIOutput(json.content.first?.text ?? "")
     }
 
     private struct APIErrorResponse: Decodable {
