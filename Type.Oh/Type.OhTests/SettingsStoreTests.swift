@@ -22,28 +22,33 @@ struct SettingsStoreTests {
         #expect(freshStore().activeProvider == .appleOnDevice)
     }
 
-    @Test func defaultShowInDockIsFalse() {
-        #expect(freshStore().showInDock == false)
+    @Test func defaultShowInDockIsTrue() {
+        #expect(freshStore().showInDock == true)
     }
 
     @Test func defaultOnboardingNotCompleted() {
         #expect(freshStore().hasCompletedOnboarding == false)
     }
 
-    @Test func defaultScratchpadHotkeyIsDisabled() {
-        #expect(freshStore().scratchpadHotkey == nil)
+    @Test func defaultStoreScratchpadHotkeyIsF15() {
+        #expect(freshStore().scratchpadHotkey == .defaultScratchpad)
     }
 
     // MARK: - Hotkey defaults
 
-    @Test func defaultVoiceHotkeyIsCtrlF13() {
+    @Test func defaultVoiceHotkeyIsF13() {
         #expect(HotkeyConfig.defaultVoice.keyCode == 105)
-        #expect(HotkeyConfig.defaultVoice.modifiers == 4096)
+        #expect(HotkeyConfig.defaultVoice.modifiers == 0)
     }
 
-    @Test func defaultEditorHotkeyIsOptF13() {
-        #expect(HotkeyConfig.defaultEditor.keyCode == 105)
-        #expect(HotkeyConfig.defaultEditor.modifiers == 2048)
+    @Test func defaultEditorHotkeyIsF14() {
+        #expect(HotkeyConfig.defaultEditor.keyCode == 107)
+        #expect(HotkeyConfig.defaultEditor.modifiers == 0)
+    }
+
+    @Test func defaultScratchpadHotkeyIsF15() {
+        #expect(HotkeyConfig.defaultScratchpad.keyCode == 113)
+        #expect(HotkeyConfig.defaultScratchpad.modifiers == 0)
     }
 
     // MARK: - ProviderID

@@ -1,19 +1,69 @@
 import SwiftUI
 import ServiceManagement
 
+enum SettingsTab: String, Codable, Sendable {
+    case general, providers, presets, translation, models
+}
+
+enum SettingsTabRoute {
+    private static let pendingTabKey = "typeoh.pendingSettingsTab"
+    static let notificationName = NSNotification.Name("typeoh.openSettings.tab")
+
+    static func open(_ tab: SettingsTab, defaults: UserDefaults = .standard) {
+        setPendingTab(tab, defaults: defaults)
+        NotificationCenter.default.post(name: notificationName, object: tab.rawValue)
+    }
+
+    static func setPendingTab(_ tab: SettingsTab, defaults: UserDefaults = .standard) {
+        defaults.set(tab.rawValue, forKey: pendingTabKey)
+    }
+
+    static func consumePendingTab(defaults: UserDefaults = .standard) -> SettingsTab? {
+        defer { defaults.removeObject(forKey: pendingTabKey) }
+        guard let rawValue = defaults.string(forKey: pendingTabKey) else { return nil }
+        return SettingsTab(rawValue: rawValue)
+    }
+
+    static func clearPendingTab(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: pendingTabKey)
+    }
+}
+
 struct SettingsWindow: View {
     @Environment(SettingsStore.self) private var settings
+    @State private var selectedTab: SettingsTab = .general
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             GeneralTab()
                 .tabItem { Label("General", systemImage: "gear") }
+                .tag(SettingsTab.general)
             ProvidersTab()
                 .tabItem { Label("Providers", systemImage: "brain.filled.head.profile") }
+                .tag(SettingsTab.providers)
+            PresetsTab()
+                .tabItem { Label("Presets", systemImage: "paintbrush") }
+                .tag(SettingsTab.presets)
+            TranslationTab()
+                .tabItem { Label("Translation", systemImage: "translate") }
+                .tag(SettingsTab.translation)
             ModelsTab()
-                .tabItem { Label("Models", systemImage: "waveform") }
+                .tabItem { Label("Whisper", systemImage: "waveform") }
+                .tag(SettingsTab.models)
         }
-        .frame(width: 520, height: 620)
+        .frame(width: 600, height: 640)
+        .onAppear {
+            if let pendingTab = SettingsTabRoute.consumePendingTab() {
+                selectedTab = pendingTab
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: SettingsTabRoute.notificationName)) { note in
+            if let raw = note.object as? String,
+               let tab = SettingsTab(rawValue: raw) {
+                SettingsTabRoute.clearPendingTab()
+                selectedTab = tab
+            }
+        }
     }
 }
 
@@ -111,7 +161,7 @@ private struct GeneralTab: View {
     private func resetHotkeysToDefaults() {
         voiceHotkeyDraft = .defaultVoice
         editorHotkeyDraft = .defaultEditor
-        scratchpadHotkeyDraft = nil
+        scratchpadHotkeyDraft = .defaultScratchpad
         hotkeyError = nil
         saveHotkeys()
     }
@@ -122,10 +172,16 @@ private struct GeneralTab: View {
 private struct ProvidersTab: View {
     @Environment(SettingsStore.self) private var settings
 
-    @State private var storedKeys:       [ProviderID: String] = [:]
-    @State private var editingProvider:  ProviderID?
-    @State private var draftKey         = ""
-    @State private var saveError:        String?
+    /// Presence per provider — populated from `KeychainStore.hasKey`, which
+    /// is a metadata-only query and does *not* trigger the keychain password
+    /// prompt. Opening Settings is therefore free.
+    @State private var keyPresent:      [ProviderID: Bool] = [:]
+    /// Last-4 of the actual key — only filled in after the user explicitly
+    /// taps Reveal, which performs the prompting load.
+    @State private var revealedSuffix:  [ProviderID: String] = [:]
+    @State private var editingProvider: ProviderID?
+    @State private var draftKey        = ""
+    @State private var saveError:       String?
 
     var body: some View {
         @Bindable var settings = settings
@@ -135,7 +191,7 @@ private struct ProvidersTab: View {
                     ForEach(ProviderID.allCases, id: \.self) { p in
                         HStack {
                             Text(p.displayName)
-                            if p.requiresAPIKey && storedKeys[p] == nil {
+                            if p.requiresAPIKey && keyPresent[p] == false {
                                 Image(systemName: "exclamationmark.circle.fill")
                                     .foregroundStyle(.orange)
                                     .imageScale(.small)
@@ -146,7 +202,7 @@ private struct ProvidersTab: View {
                 }
                 .onChange(of: settings.activeProvider) { settings.save() }
 
-                if settings.activeProvider.requiresAPIKey && storedKeys[settings.activeProvider] == nil {
+                if settings.activeProvider.requiresAPIKey && keyPresent[settings.activeProvider] == false {
                     Label(
                         "\(settings.activeProvider.displayName) requires an API key — add it below.",
                         systemImage: "exclamationmark.triangle.fill"
@@ -157,7 +213,7 @@ private struct ProvidersTab: View {
             }
             Section("API Keys") {
                 ForEach(ProviderID.allCases.filter(\.requiresAPIKey), id: \.self) { apiKeyRow($0) }
-                Text("If a key you entered before isn't working, tap Change to re-enter it.")
+                Text("Stored keys are kept in macOS Keychain. Reveal reads the actual key (you'll see a one-time keychain prompt — tick \"Always Allow\" to avoid future prompts).")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -169,12 +225,13 @@ private struct ProvidersTab: View {
         }
         .formStyle(.grouped)
         .padding()
-        .onAppear { loadKeys() }
+        .onAppear { refreshPresence() }
     }
 
     @ViewBuilder
     private func apiKeyRow(_ provider: ProviderID) -> some View {
-        let stored = storedKeys[provider]
+        let present = keyPresent[provider] ?? false
+        let suffix  = revealedSuffix[provider]
         LabeledContent(provider.displayName) {
             if editingProvider == provider {
                 HStack {
@@ -183,7 +240,8 @@ private struct ProvidersTab: View {
                     Button("Save") {
                         let ok = KeychainStore.save(key: draftKey, for: provider)
                         if ok {
-                            storedKeys[provider] = draftKey
+                            keyPresent[provider] = true
+                            revealedSuffix[provider] = String(draftKey.suffix(4))
                             draftKey = ""; editingProvider = nil; saveError = nil
                         } else {
                             saveError = "Keychain error — make sure the app is signed and try again."
@@ -193,22 +251,41 @@ private struct ProvidersTab: View {
                 }
             } else {
                 HStack {
-                    Text(stored.map { "••••" + String($0.suffix(4)) } ?? "Not set")
-                        .foregroundStyle(stored == nil ? .secondary : .primary)
-                    Button(stored == nil ? "Set" : "Change") { draftKey = ""; editingProvider = provider }
+                    if let suffix {
+                        Text("••••" + suffix).foregroundStyle(.primary)
+                    } else if present {
+                        Text("Configured").foregroundStyle(.secondary)
+                    } else {
+                        Text("Not set").foregroundStyle(.secondary)
+                    }
+                    Button(present ? "Change" : "Set") {
+                        draftKey = ""; editingProvider = provider
+                    }
+                    .buttonStyle(.bordered)
+                    if present, suffix == nil {
+                        Button("Reveal") {
+                            if let key = KeychainStore.load(for: provider) {
+                                revealedSuffix[provider] = String(key.suffix(4))
+                            }
+                        }
                         .buttonStyle(.bordered)
-                    if stored != nil {
-                        Button("Clear") { KeychainStore.delete(for: provider); storedKeys[provider] = nil }
-                            .buttonStyle(.bordered)
+                    }
+                    if present {
+                        Button("Clear") {
+                            KeychainStore.delete(for: provider)
+                            keyPresent[provider] = false
+                            revealedSuffix[provider] = nil
+                        }
+                        .buttonStyle(.bordered)
                     }
                 }
             }
         }
     }
 
-    private func loadKeys() {
+    private func refreshPresence() {
         for p in ProviderID.allCases where p.requiresAPIKey {
-            storedKeys[p] = KeychainStore.load(for: p)
+            keyPresent[p] = KeychainStore.hasKey(for: p)
         }
     }
 }
@@ -307,5 +384,202 @@ private struct ModelsTab: View {
                 .disabled(manager.isDownloading)
             }
         }
+    }
+}
+
+// MARK: - Presets
+
+private struct PresetsTab: View {
+    @Environment(SettingsStore.self) private var settings
+    @State private var editingID: String?
+    @State private var draftLabel  = ""
+    @State private var draftEmoji  = "🎨"
+    @State private var draftPrompt = ""
+
+    var body: some View {
+        @Bindable var settings = settings
+        Form {
+            Section {
+                Text("Custom presets show up alongside the built-in styles in LazyPad's sidebar. Up to \(CustomStylePreset.maxCount) custom presets are supported.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Section("Your Presets") {
+                if settings.customStylePresets.isEmpty {
+                    Text("No custom presets yet.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(settings.customStylePresets) { preset in
+                    presetRow(preset)
+                }
+                if settings.customStylePresets.count < CustomStylePreset.maxCount {
+                    Button {
+                        beginAdding()
+                    } label: {
+                        Label("Add Preset", systemImage: "plus.circle")
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+
+            if editingID != nil {
+                Section(editingID == "new" ? "New Preset" : "Edit Preset") {
+                    LabeledContent("Name") {
+                        TextField("e.g. Pirate", text: $draftLabel)
+                            .textFieldStyle(.roundedBorder)
+                    }
+                    LabeledContent("Emoji") {
+                        TextField("🎨", text: $draftEmoji)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 80)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Prompt")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextEditor(text: $draftPrompt)
+                            .font(.body)
+                            .frame(minHeight: 100)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                            )
+                    }
+                    HStack {
+                        Button("Cancel") { editingID = nil }
+                        Spacer()
+                        Button("Save") { commitDraft() }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(draftLabel.trimmingCharacters(in: .whitespaces).isEmpty ||
+                                      draftPrompt.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    @ViewBuilder
+    private func presetRow(_ preset: CustomStylePreset) -> some View {
+        HStack {
+            Text(preset.emoji)
+            Text(preset.label).font(.body.weight(.medium))
+            Text(preset.promptFragment)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer()
+            Button("Edit") {
+                editingID = preset.id
+                draftLabel  = preset.label
+                draftEmoji  = preset.emoji
+                draftPrompt = preset.promptFragment
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            Button(role: .destructive) {
+                settings.customStylePresets.removeAll { $0.id == preset.id }
+                settings.save()
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+        }
+    }
+
+    private func beginAdding() {
+        editingID = "new"
+        draftLabel = ""
+        draftEmoji = "🎨"
+        draftPrompt = ""
+    }
+
+    private func commitDraft() {
+        let label  = draftLabel.trimmingCharacters(in: .whitespaces)
+        let emoji  = draftEmoji.trimmingCharacters(in: .whitespaces).isEmpty ? "🎨" : draftEmoji
+        let prompt = draftPrompt.trimmingCharacters(in: .whitespaces)
+        guard !label.isEmpty, !prompt.isEmpty else { return }
+
+        if let id = editingID, id != "new",
+           let idx = settings.customStylePresets.firstIndex(where: { $0.id == id }) {
+            settings.customStylePresets[idx].label = label
+            settings.customStylePresets[idx].emoji = emoji
+            settings.customStylePresets[idx].promptFragment = prompt
+        } else {
+            guard settings.customStylePresets.count < CustomStylePreset.maxCount else { return }
+            let newPreset = CustomStylePreset(
+                id: "custom-\(UUID().uuidString.prefix(8))",
+                label: label,
+                emoji: emoji,
+                promptFragment: prompt
+            )
+            settings.customStylePresets.append(newPreset)
+        }
+        settings.save()
+        editingID = nil
+    }
+}
+
+// MARK: - Translation
+
+private struct TranslationTab: View {
+    @Environment(SettingsStore.self) private var settings
+
+    var body: some View {
+        @Bindable var settings = settings
+        Form {
+            Section("Translation Provider") {
+                Picker("Engine", selection: Binding(
+                    get: { settings.translationProvider ?? .nativeOS },
+                    set: { settings.translationProvider = $0; settings.save() }
+                )) {
+                    ForEach(TranslationProviderID.allCases, id: \.self) { provider in
+                        Text(provider.displayName).tag(provider)
+                    }
+                }
+                .pickerStyle(.inline)
+
+                if let current = settings.translationProvider {
+                    Text(current.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Section("Default Languages") {
+                LabeledContent("Source") {
+                    Text(settings.sourceLanguage.map(localizedName) ?? "Auto-detect")
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("Target") {
+                    Text(localizedName(settings.targetLanguage))
+                        .foregroundStyle(.secondary)
+                }
+                Text("Pick defaults the next time you open a translate panel — they persist automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Section {
+                Text("All translation actions across LazyPad and ReType use this engine and these languages. If the engine isn't configured the next time you translate, this Settings tab opens automatically.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private func localizedName(_ id: String) -> String {
+        Locale.current.localizedString(forIdentifier: id) ?? id
     }
 }

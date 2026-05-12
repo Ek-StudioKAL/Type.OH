@@ -23,33 +23,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - App lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        CrashReporter.install()
         NSApp.setActivationPolicy(settingsStore.showInDock ? .regular : .accessory)
         if let appIcon = NSImage(named: NSImage.applicationIconName) {
             NSApp.applicationIconImage = appIcon
         }
 
-        HotkeyManager.shared.onVoiceHotkey  = { [weak self] in Task { @MainActor in await self?.handleVoiceKey()  } }
-        HotkeyManager.shared.onEditorHotkey = { [weak self] in Task { @MainActor in await self?.handleEditorKey() } }
-        HotkeyManager.shared.onScratchpadHotkey = { [weak self] in Task { @MainActor in self?.openScratchpad() } }
+        HotkeyManager.shared.onVoiceHotkey = { [weak self] in
+            guard let self else { return }
+            Task { await self.handleVoiceKey() }
+        }
+        HotkeyManager.shared.onEditorHotkey = { [weak self] in
+            guard let self else { return }
+            Task { await self.handleEditorKey() }
+        }
+        HotkeyManager.shared.onScratchpadHotkey = { [weak self] in
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                self.openScratchpad()
+            }
+        }
         applyHotkeys()
 
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showAbout"), object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.showAboutPanel() }
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                self.showAboutPanel()
+            }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.voiceHotkey"), object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in await self?.handleVoiceKey() }
+            guard let self else { return }
+            Task { await self.handleVoiceKey() }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.editorHotkey.sticky"), object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.showEditorPanel(with: "", sticky: true) }
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                self.showEditorPanel(with: "", sticky: true)
+            }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showOnboarding"), object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.showOnboarding() }
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                self.showOnboarding()
+            }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.openScratchpad"), object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.openScratchpad() }
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                self.openScratchpad()
+            }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.hotkeysChanged"), object: nil, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.applyHotkeys() }
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                self.applyHotkeys()
+            }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.openSettings"), object: nil, queue: .main) { _ in
             Task { @MainActor in
@@ -59,11 +87,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
             }
         }
-        NotificationCenter.default.addObserver(forName: .whisperModelDownloaded, object: nil, queue: .main) { [weak self] note in
-            guard let self, let modelID = note.object as? String,
-                  self.settingsStore.whisperModel == modelID,
-                  let folder = ModelManager.shared.modelFolderURL(for: modelID) else { return }
+        NotificationCenter.default.addObserver(forName: SettingsTabRoute.notificationName, object: nil, queue: .main) { note in
+            let requestedTab = (note.object as? String).flatMap(SettingsTab.init(rawValue:))
             Task { @MainActor in
+                if let requestedTab {
+                    SettingsTabRoute.setPendingTab(requestedTab)
+                }
+                NSApp.setActivationPolicy(.regular)
+                NSApp.activate(ignoringOtherApps: true)
+                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                // The TabView itself observes the same notification; this side
+                // just makes sure the window is visible to react to it.
+            }
+        }
+        NotificationCenter.default.addObserver(forName: .whisperModelDownloaded, object: nil, queue: .main) { [weak self] note in
+            guard let self, let modelID = note.object as? String else { return }
+            Task { @MainActor [weak self, modelID] in
+                guard let self,
+                      self.settingsStore.whisperModel == modelID,
+                      let folder = ModelManager.shared.modelFolderURL(for: modelID) else { return }
                 try? await self.whisperService.loadModel(name: modelID, at: folder)
             }
         }
@@ -73,6 +115,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
            ModelManager.shared.isDownloaded(settingsStore.whisperModel) {
             let name = settingsStore.whisperModel
             Task { try? await whisperService.loadModel(name: name, at: folder) }
+        }
+
+        // Pre-warm the active provider's keychain entry off the main thread so
+        // the single annoying prompt (if any) happens once at launch — never
+        // again during a generation. Apple on-device skips the keychain
+        // entirely. Inactive providers stay un-prompted until the user
+        // explicitly Reveals or generates with them.
+        let active = settingsStore.activeProvider
+        DispatchQueue.global(qos: .userInitiated).async {
+            KeychainStore.prefetch(active)
         }
 
         // First-launch onboarding handles permission prompts itself.
@@ -105,7 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             let modelName = settingsStore.whisperModel
             guard let folder = ModelManager.shared.modelFolderURL(for: modelName) else {
-                showBannerError("No Whisper model downloaded. Open Settings → Models to download one.")
+                showBannerError("No Whisper model downloaded. Open Settings → Whisper to download one.")
                 return
             }
             do {
@@ -155,9 +207,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("[Type.OH] Editor hotkey — AX trusted: %d, source: %@",
               AXIsProcessTrusted() ? 1 : 0,
               capturedApp?.localizedName ?? "(none)")
-        let text = await selectionReader.readSelectedText(from: capturedApp)
-        NSLog("[Type.OH] Selection captured: %d chars", text?.count ?? -1)
-        showEditorPanel(with: text ?? "")
+        let captured = await selectionReader.readSelectedText(from: capturedApp)
+        NSLog("[Type.OH] Selection captured: %d chars, editable=%d",
+              captured.text?.count ?? -1,
+              captured.isEditable ? 1 : 0)
+
+        // If the source app can't accept a paste-back (PDF viewer, web-view
+        // static text, image OCR, etc.) the ReType compact panel is useless —
+        // the user can't apply the rewrite anywhere. Route to LazyPad with the
+        // text pre-loaded so they can edit & copy/paste manually.
+        if let text = captured.text, !text.isEmpty, !captured.isEditable {
+            ToastOverlay.shared.show("Source isn't editable — opened in LazyPad.")
+            openScratchpad(insertingText: text)
+            return
+        }
+
+        showEditorPanel(with: captured.text ?? "")
     }
 
     func showEditorPanel(with text: String, sticky: Bool = false) {
@@ -221,7 +286,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         onboardingPanel = panel
     }
 
-    func openScratchpad() {
+    func openScratchpad(insertingText text: String? = nil) {
         focusCapture.capture()
 
         if scratchpadPanelController == nil {
@@ -232,7 +297,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
         }
 
-        scratchpadPanelController?.show(using: settingsStore)
+        scratchpadPanelController?.show(using: settingsStore, insertingText: text)
     }
 
     // MARK: - Helpers

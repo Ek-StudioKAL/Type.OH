@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 private enum ScratchpadAction {
@@ -31,6 +32,7 @@ private enum ScratchpadAction {
 
 struct ScratchpadView: View {
     @Environment(SettingsStore.self) private var settings
+    @Environment(\.openSettings) private var openSettings
 
     let pasteService: PasteService
     let store: ScratchpadStore
@@ -46,6 +48,8 @@ struct ScratchpadView: View {
     @State private var isShowingTranslationPopover = false
     @State private var hasLoadedTranslationSettings = false
     @State private var isSidebarVisible = true
+    @State private var residentMemoryLabel = MemoryReporter.residentDisplayString()
+    private let memoryTickTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
     init(pasteService: PasteService, store: ScratchpadStore) {
         self.pasteService = pasteService
@@ -70,6 +74,7 @@ struct ScratchpadView: View {
         }
         .padding(14)
         .frame(minWidth: 960, maxWidth: .infinity, minHeight: 520, maxHeight: .infinity)
+        .background(NativeTranslationDriverView())
         .onChange(of: text) {
             store.scheduleSave(text)
         }
@@ -78,6 +83,15 @@ struct ScratchpadView: View {
         }
         .onDisappear {
             store.saveNow(text)
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSNotification.Name("typeoh.scratchpad.insertText"))
+        ) { note in
+            guard let incoming = note.object as? String, !incoming.isEmpty else { return }
+            insertFromExternalSelection(incoming)
+        }
+        .onReceive(memoryTickTimer) { _ in
+            residentMemoryLabel = MemoryReporter.residentDisplayString()
         }
     }
 
@@ -179,13 +193,13 @@ struct ScratchpadView: View {
 
         isProcessing = true
         setStatus("Translating…")
-        let provider = ProviderRegistry.provider(for: settings.activeProvider)
 
         do {
-            let translatedText = try await provider.translate(
+            let translatedText = try await TranslationDispatcher.translate(
                 text: input,
-                sourceLanguage: sourceLanguage.map(displayName),
-                targetLanguage: displayName(targetLanguage)
+                source: sourceLanguage,
+                target: targetLanguage,
+                using: settings
             )
 
             guard text == sourceText else {
@@ -202,11 +216,40 @@ struct ScratchpadView: View {
 
             text = textViewController.currentText ?? translatedText
             setStatus("Translate complete.")
+        } catch TranslationDispatcher.Failure.engineUnselected {
+            setErrorStatus("Pick a translation engine — opening Settings.")
+            openSettingsAt(.translation)
         } catch {
             setErrorStatus(error.localizedDescription)
         }
 
         isProcessing = false
+    }
+
+    /// Append text captured from another app (e.g. ReType invoked on a
+    /// non-editable selection). We append rather than overwrite so the user's
+    /// existing scratchpad notes aren't blown away.
+    private func insertFromExternalSelection(_ incoming: String) {
+        let trimmed = incoming
+        let separator: String
+        if text.isEmpty {
+            separator = ""
+        } else {
+            separator = text.hasSuffix("\n\n") ? "" : (text.hasSuffix("\n") ? "\n" : "\n\n")
+        }
+        let combined = text + separator + trimmed
+        let appendStart = (text as NSString).length + (separator as NSString).length
+
+        textViewController.replaceAllText(with: combined)
+        text = textViewController.currentText ?? combined
+
+        // Select the inserted block so the user immediately sees what landed.
+        let appendLength = (trimmed as NSString).length
+        let selectRange = NSRange(location: appendStart, length: appendLength)
+        if NSMaxRange(selectRange) <= (text as NSString).length {
+            selectedRange = selectRange
+        }
+        setStatus("Loaded \(trimmed.count) characters from selection.")
     }
 
     private func selectedTextRange(in sourceText: String) -> NSRange? {
@@ -257,11 +300,27 @@ struct ScratchpadView: View {
         Locale.current.localizedString(forIdentifier: lang.minimalIdentifier) ?? lang.minimalIdentifier
     }
 
+    private var currentLanguagePairLabel: String {
+        let src = sourceLanguage.map(displayName) ?? "Auto"
+        let dst = displayName(targetLanguage)
+        return "Translate: \(src) → \(dst)"
+    }
+
+    private var translationScopeHint: String {
+        if selectedRange.location != NSNotFound, selectedRange.length > 0 {
+            return "Translates the selected \(selectedRange.length) characters."
+        }
+        return "Translates the entire scratchpad."
+    }
+
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    sidebarSection(title: "Styles") {
+                    sidebarSectionWithAccessory(
+                        title: "Styles",
+                        accessory: { addPresetAccessory }
+                    ) {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(StylePresets.all) { preset in
                                 sidebarButton(
@@ -272,6 +331,9 @@ struct ScratchpadView: View {
                                     runAction(.style(preset))
                                 }
                                 .disabled(isProcessing || text.isEmpty)
+                            }
+                            ForEach(settings.customStylePresets) { preset in
+                                sidebarCustomPresetButton(preset)
                             }
                         }
                     }
@@ -319,6 +381,17 @@ struct ScratchpadView: View {
                                     }
                                 )
                             )
+                            sidebarToggle(
+                                title: "Emojify ✨",
+                                detail: "Sprinkle relevant emoji into AI rewrites and translations.",
+                                isOn: Binding(
+                                    get: { settings.emojify },
+                                    set: { value in
+                                        settings.emojify = value
+                                        settings.save()
+                                    }
+                                )
+                            )
                         }
                     }
                 }
@@ -328,9 +401,24 @@ struct ScratchpadView: View {
             Divider()
 
             HStack(spacing: 10) {
-                bottomIconButton(title: "Settings", systemImage: "gearshape") {
-                    NotificationCenter.default.post(name: NSNotification.Name("typeoh.openSettings"), object: nil)
+                SettingsLink {
+                    VStack(spacing: 4) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 16, weight: .regular))
+                        Text("Settings")
+                            .font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.plain)
+                .simultaneousGesture(TapGesture().onEnded {
+                    // SettingsLink only flips the scene; we also need the app
+                    // promoted so the window comes to the front when LazyPad
+                    // is foreground.
+                    NSApp.setActivationPolicy(.regular)
+                    NSApp.activate(ignoringOtherApps: true)
+                })
+
                 bottomIconButton(title: "Setup", systemImage: "wand.and.stars.inverse") {
                     NotificationCenter.default.post(name: NSNotification.Name("typeoh.showOnboarding"), object: nil)
                 }
@@ -382,7 +470,7 @@ struct ScratchpadView: View {
             }
             .disabled(isProcessing || text.isEmpty)
 
-            toolbarButton(title: "Concise", systemImage: "minus.square") {
+            toolbarButton(title: "Concise", literalGlyph: "\u{10080A}") {
                 runAction(.concise)
             }
             .disabled(isProcessing || text.isEmpty)
@@ -391,22 +479,72 @@ struct ScratchpadView: View {
                 isShowingTranslationPopover.toggle()
             }
             .disabled(isProcessing || text.isEmpty)
-            .popover(isPresented: $isShowingTranslationPopover, arrowEdge: .bottom) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Translate")
-                        .font(.headline)
-                    LanguagePicker(sourceLanguage: $sourceLanguage, targetLanguage: $targetLanguage)
-                        .onChange(of: sourceLanguage) { persistTranslationSettings() }
-                        .onChange(of: targetLanguage) { persistTranslationSettings() }
-                    Button("Translate") {
-                        isShowingTranslationPopover = false
-                        runAction(.translate)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isProcessing || text.isEmpty)
+            .contextMenu {
+                Text(currentLanguagePairLabel)
+                Divider()
+                Button("Configure languages…") {
+                    isShowingTranslationPopover = true
                 }
-                .padding(14)
-                .frame(width: 320)
+                if sourceLanguage != nil {
+                    Button("Swap source ⇄ target") {
+                        if let src = sourceLanguage {
+                            sourceLanguage = targetLanguage
+                            targetLanguage = src
+                            persistTranslationSettings()
+                        }
+                    }
+                }
+                if sourceLanguage != nil {
+                    Button("Reset source to auto-detect") {
+                        sourceLanguage = nil
+                        persistTranslationSettings()
+                    }
+                }
+            }
+            .popover(isPresented: $isShowingTranslationPopover, arrowEdge: .bottom) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "translate")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.accentColor)
+                        Text("Translate")
+                            .font(.headline)
+                        Spacer()
+                    }
+
+                    LanguagePicker(
+                        sourceLanguage: $sourceLanguage,
+                        targetLanguage: $targetLanguage,
+                        compact: false,
+                        availability: settings.translationProvider == .nativeOS ? .nativeOSOffline : .allLocaleLanguages
+                    )
+                    .onChange(of: sourceLanguage) { persistTranslationSettings() }
+                    .onChange(of: targetLanguage) { persistTranslationSettings() }
+
+                    Text(translationScopeHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    HStack {
+                        Button("Cancel") {
+                            isShowingTranslationPopover = false
+                        }
+                        .buttonStyle(.bordered)
+                        .keyboardShortcut(.escape)
+
+                        Spacer()
+
+                        Button("Translate") {
+                            isShowingTranslationPopover = false
+                            runAction(.translate)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.return)
+                        .disabled(isProcessing || text.isEmpty)
+                    }
+                }
+                .padding(16)
+                .frame(width: 360)
             }
 
             Spacer(minLength: 12)
@@ -424,6 +562,7 @@ struct ScratchpadView: View {
             .disabled(text.isEmpty)
 
             toolbarButton(title: "Clear", systemImage: "trash") {
+                textViewController.resetText(to: "")
                 text = ""
                 selectedRange = NSRange(location: 0, length: 0)
                 store.scheduleSave(text)
@@ -448,6 +587,9 @@ struct ScratchpadView: View {
                 Text("Whisper: \(whisperModelStatusLabel)")
                 Text("•")
                 Text("Provider: \(providerStatusLabel)")
+                Text("•")
+                Text("Mem: \(residentMemoryLabel)")
+                    .help("Resident memory footprint")
             }
             .multilineTextAlignment(.center)
 
@@ -464,6 +606,27 @@ struct ScratchpadView: View {
     private func toolbarButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             toolbarLabel(title: title, systemImage: systemImage)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Renders a literal SF Symbols private-use codepoint (e.g. one pasted
+    /// directly from the SF Symbols app). Used when the symbol's *name* isn't
+    /// known but the glyph is.
+    @ViewBuilder
+    private func toolbarButton(title: String, literalGlyph: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Text(literalGlyph)
+                    .font(.system(size: 17, weight: .regular))
+                    .frame(width: 28, height: 22)
+                Text(title)
+                    .font(.caption2)
+                    .lineLimit(1)
+            }
+            .frame(width: 62)
+            .foregroundStyle(.primary)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -533,6 +696,82 @@ struct ScratchpadView: View {
     }
 
     @ViewBuilder
+    private func sidebarSectionWithAccessory<Content: View, Accessory: View>(
+        title: String,
+        @ViewBuilder accessory: () -> Accessory,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Spacer()
+                accessory()
+            }
+            content()
+        }
+    }
+
+    private var addPresetAccessory: some View {
+        Button {
+            openSettingsAt(.presets)
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 18, height: 18)
+                .background(Color.secondary.opacity(0.15), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .help("Add a custom preset")
+        .disabled(settings.customStylePresets.count >= CustomStylePreset.maxCount)
+    }
+
+    /// Reliable settings-open helper. `SwiftUI.openSettings` handles both
+    /// fresh-mount and refocus cases (the notification + sendAction dance
+    /// silently fails on macOS when the Settings scene hasn't been realized
+    /// yet). We additionally post the tab notification for the case where the
+    /// SettingsWindow body is already alive — `.onReceive` flips the tab live.
+    /// And we write the pending tab to UserDefaults so `.onAppear` consumes it
+    /// when the SettingsWindow body is freshly mounted.
+    private func openSettingsAt(_ tab: SettingsTab) {
+        SettingsTabRoute.setPendingTab(tab)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
+        NotificationCenter.default.post(
+            name: SettingsTabRoute.notificationName,
+            object: tab.rawValue
+        )
+    }
+
+    @ViewBuilder
+    private func sidebarCustomPresetButton(_ preset: CustomStylePreset) -> some View {
+        let bridged = StylePreset(
+            id: preset.id,
+            label: preset.label,
+            emoji: preset.emoji,
+            promptFragment: preset.promptFragment
+        )
+        Button {
+            runAction(.style(bridged))
+        } label: {
+            HStack(spacing: 10) {
+                Text(preset.emoji)
+                    .frame(width: 18)
+                Text(preset.label)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+        }
+        .buttonStyle(.plain)
+        .disabled(isProcessing || text.isEmpty)
+    }
+
+    @ViewBuilder
     private func sidebarToggle(title: String, detail: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             Text(title)
@@ -592,31 +831,27 @@ struct ScratchpadView: View {
 
     @ViewBuilder
     private func providerSidebarIcon(for provider: ProviderID) -> some View {
-        if let image = providerAssetImage(for: provider) {
-            Image(nsImage: image)
-                .resizable()
-                .renderingMode(.original)
-                .scaledToFit()
-        } else {
-            Image(systemName: providerSymbol(for: provider))
-                .frame(width: 18, height: 18)
-        }
-    }
-
-    private func providerAssetImage(for provider: ProviderID) -> NSImage? {
-        let assetName: String?
         switch provider {
         case .appleOnDevice:
-            assetName = nil
+            Image(systemName: "apple.intelligence")
+                .font(.system(size: 15, weight: .regular))
+                .symbolRenderingMode(.hierarchical)
         case .anthropic:
-            assetName = "Claude Sidebar Icon"
+            Image("Claude")
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
         case .openAI:
-            assetName = "ChatGPT Sidebar Icon"
+            Image("GPT")
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
         case .google:
-            assetName = "Gemini Sidebar Icon"
+            Image("Gemini")
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
         }
-        guard let assetName else { return nil }
-        return NSImage(named: assetName)
     }
 
     @ViewBuilder

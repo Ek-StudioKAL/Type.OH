@@ -10,15 +10,27 @@ extension HotkeyConfig {
     var hasModifiers: Bool {
         modifiers != 0
     }
+
+    /// Extended function keys (F13–F19) are safe to use without modifiers —
+    /// almost no app or system shortcut claims them.
+    var isStandaloneSafeKey: Bool {
+        // F13 = 105, F14 = 107, F15 = 113, F16 = 106, F17 = 64, F18 = 79, F19 = 80
+        let safeStandaloneKeys: Set<UInt32> = [105, 106, 107, 113, 64, 79, 80]
+        return safeStandaloneKeys.contains(keyCode)
+    }
 }
 
 func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: HotkeyConfig?) -> String? {
     guard let voice else { return "Voice recording needs a hotkey." }
     guard let editor else { return "AI Editor needs a hotkey." }
-    guard voice.hasModifiers, editor.hasModifiers else { return "Global hotkeys must include at least one modifier key." }
-    if let scratchpad, !scratchpad.hasModifiers {
-        return "LazyPad hotkeys must include at least one modifier key."
+
+    func needsModifierError(_ name: String, _ hk: HotkeyConfig) -> String? {
+        guard !hk.hasModifiers && !hk.isStandaloneSafeKey else { return nil }
+        return "\(name) needs at least one modifier key (or an F13–F19 key)."
     }
+    if let err = needsModifierError("Voice recording", voice) { return err }
+    if let err = needsModifierError("AI Editor", editor)     { return err }
+    if let scratchpad, let err = needsModifierError("LazyPad", scratchpad) { return err }
 
     let assignments = [
         ("Voice recording", voice),
@@ -51,7 +63,8 @@ struct HotkeyConfigurationEditor: View {
                 hotkey: Binding(
                     get: { voiceHotkey },
                     set: { if let hotkey = $0 { voiceHotkey = hotkey } }
-                )
+                ),
+                onClear: { voiceHotkey = .defaultVoice }
             )
 
             hotkeyRow(
@@ -60,24 +73,31 @@ struct HotkeyConfigurationEditor: View {
                 hotkey: Binding(
                     get: { editorHotkey },
                     set: { if let hotkey = $0 { editorHotkey = hotkey } }
-                )
+                ),
+                onClear: { editorHotkey = .defaultEditor }
             )
 
             hotkeyRow(
                 title: "LazyPad",
-                detail: "Optional. Leave empty if you do not want a global shortcut.",
+                detail: "Open the LazyPad workspace.",
                 hotkey: $scratchpadHotkey,
-                allowsClearing: true
+                onClear: { scratchpadHotkey = .defaultScratchpad }
             )
 
-            Text("Record a shortcut with at least one modifier key.")
+            Text("Defaults are F13 for Voice, F14 for AI Editor, and F15 for LazyPad. F13–F19 work without modifiers; everything else needs ⌘ / ⌃ / ⌥ / ⇧.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     @ViewBuilder
-    private func hotkeyRow(title: String, detail: String, hotkey: Binding<HotkeyConfig?>, allowsClearing: Bool = false) -> some View {
+    private func hotkeyRow(
+        title: String,
+        detail: String,
+        hotkey: Binding<HotkeyConfig?>,
+        onClear: @escaping () -> Void
+    ) -> some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -93,13 +113,14 @@ struct HotkeyConfigurationEditor: View {
             HotkeyRecorderField(hotkey: hotkey)
                 .frame(width: 150)
 
-            if allowsClearing {
-                Button("Clear") {
-                    hotkey.wrappedValue = nil
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+            Button {
+                onClear()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
+            .help("Clear / reset this hotkey")
         }
     }
 }
@@ -136,6 +157,14 @@ final class HotkeyRecorderButton: NSButton {
     var onCapture: ((HotkeyConfig?) -> Void)?
     private var isRecording = false
 
+    /// Local event monitor active during recording. We use a monitor instead of
+    /// overriding keyDown/performKeyEquivalent because NSButton's own routing
+    /// drops many non-Cmd events — the system either handles
+    /// them as key equivalents on the window before they reach this view, or
+    /// NSButton swallows them. The monitor sees every key event at the app
+    /// level and lets us return nil to consume it.
+    private var eventMonitor: Any?
+
     var displayedHotkey: HotkeyConfig? {
         didSet {
             updateDisplay()
@@ -148,7 +177,7 @@ final class HotkeyRecorderButton: NSButton {
         bezelStyle = .rounded
         font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         focusRingType = .default
-        action = #selector(beginRecording)
+        action = #selector(toggleRecording)
         target = self
         updateDisplay()
     }
@@ -159,45 +188,64 @@ final class HotkeyRecorderButton: NSButton {
 
     override var acceptsFirstResponder: Bool { true }
 
-    @objc
-    private func beginRecording() {
-        guard !isRecording else {
-            stopRecording()
-            return
+    deinit {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
         }
+    }
 
+    @objc
+    private func toggleRecording() {
+        if isRecording {
+            stopRecording()
+        } else {
+            beginRecording()
+        }
+    }
+
+    private func beginRecording() {
+        guard !isRecording else { return }
         isRecording = true
         window?.makeFirstResponder(self)
+        installMonitor()
         updateDisplay()
     }
 
     private func stopRecording() {
+        guard isRecording else { return }
         isRecording = false
+        removeMonitor()
         updateDisplay()
     }
 
-    override func keyDown(with event: NSEvent) {
-        guard isRecording else {
-            super.keyDown(with: event)
-            return
+    private func installMonitor() {
+        removeMonitor()
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+            guard let self, self.isRecording else { return event }
+            if event.type == .flagsChanged {
+                self.updateDisplay()
+                // Pass flag changes through so the rest of the UI still sees them.
+                return event
+            }
+            // .keyDown — capture and swallow so no other handler fires.
+            self.capture(event)
+            return nil
         }
-        capture(event)
+    }
+
+    private func removeMonitor() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+        eventMonitor = nil
     }
 
     override func flagsChanged(with event: NSEvent) {
-        guard isRecording else {
+        // The local monitor handles updates while recording. Outside of
+        // recording we let AppKit do its default thing.
+        if !isRecording {
             super.flagsChanged(with: event)
-            return
         }
-        updateDisplay()
-    }
-
-    override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard isRecording else {
-            return super.performKeyEquivalent(with: event)
-        }
-        capture(event)
-        return true
     }
 
     override func resignFirstResponder() -> Bool {
@@ -211,16 +259,21 @@ final class HotkeyRecorderButton: NSButton {
     private func capture(_ event: NSEvent) {
         guard isRecording else { return }
 
+        // Escape cancels recording without changing the hotkey.
         if event.keyCode == 53 {
             stopRecording()
             return
         }
 
+        // Ignore raw modifier key-downs — they'd never make a valid shortcut on
+        // their own. The user has to press a real key while holding modifiers.
         if modifierOnlyKeyCodes.contains(event.keyCode) {
             return
         }
 
         guard let hotkey = makeHotkey(from: event) else {
+            // No modifier held → invalid. Beep but stay in recording mode so the
+            // user can try again without re-clicking the field.
             NSSound.beep()
             return
         }
@@ -251,8 +304,9 @@ private func makeHotkey(from event: NSEvent) -> HotkeyConfig? {
         .intersection(.deviceIndependentFlagsMask)
         .intersection([.command, .option, .control, .shift])
     let modifiers = carbonModifiers(from: relevantFlags)
-    guard modifiers != 0 else { return nil }
-    return HotkeyConfig(keyCode: UInt32(event.keyCode), modifiers: modifiers)
+    let hotkey = HotkeyConfig(keyCode: UInt32(event.keyCode), modifiers: modifiers)
+    guard modifiers != 0 || hotkey.isStandaloneSafeKey else { return nil }
+    return hotkey
 }
 
 private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {

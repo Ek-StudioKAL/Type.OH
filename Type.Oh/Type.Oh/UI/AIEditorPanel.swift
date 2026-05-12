@@ -4,6 +4,7 @@ import SwiftUI
 
 struct AIEditorPanel: View {
     @Environment(SettingsStore.self) private var settings
+    @Environment(\.openSettings) private var openSettings
 
     let originalText: String
     let isSticky: Bool
@@ -44,7 +45,12 @@ struct AIEditorPanel: View {
             if mode == .style {
                 StyleChipRow(selected: $selectedStyle)
             } else if mode == .translate {
-                LanguagePicker(sourceLanguage: $sourceLanguage, targetLanguage: $targetLanguage)
+                LanguagePicker(
+                    sourceLanguage: $sourceLanguage,
+                    targetLanguage: $targetLanguage,
+                    compact: true,
+                    availability: settings.translationProvider == .nativeOS ? .nativeOSOffline : .allLocaleLanguages
+                )
                     .onChange(of: sourceLanguage) { persistTranslationSettings() }
                     .onChange(of: targetLanguage) { persistTranslationSettings() }
             }
@@ -123,8 +129,7 @@ struct AIEditorPanel: View {
                     if msg.contains("API key") || msg.contains("Settings → Providers") {
                         HStack(spacing: 12) {
                             Button("Open Settings → Providers") {
-                                NotificationCenter.default.post(
-                                    name: NSNotification.Name("typeoh.openSettings"), object: nil)
+                                openSettingsAt(.providers)
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -171,6 +176,7 @@ struct AIEditorPanel: View {
         }
         .padding(20)
         .frame(minWidth: 460, idealWidth: 520, maxWidth: 900)
+        .background(NativeTranslationDriverView())
         .onAppear { loadTranslationSettingsIfNeeded() }
     }
 
@@ -198,11 +204,15 @@ struct AIEditorPanel: View {
                 return
             }
             do {
-                result = try await provider.translate(
+                result = try await TranslationDispatcher.translate(
                     text: editableInput,
-                    sourceLanguage: sourceLanguage.map(displayName),
-                    targetLanguage: displayName(targetLanguage)
+                    source: sourceLanguage,
+                    target: targetLanguage,
+                    using: settings
                 )
+            } catch TranslationDispatcher.Failure.engineUnselected {
+                errorMessage = "Pick a translation engine — opening Settings."
+                openSettingsAt(.translation)
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -245,6 +255,20 @@ struct AIEditorPanel: View {
 
     private func displayName(_ lang: Locale.Language) -> String {
         Locale.current.localizedString(forIdentifier: lang.minimalIdentifier) ?? lang.minimalIdentifier
+    }
+
+    /// See `ScratchpadView.openSettingsAt` — same trick to make the
+    /// SwiftUI Settings scene reliably surface on the requested tab whether
+    /// it's already alive or being mounted for the first time.
+    private func openSettingsAt(_ tab: SettingsTab) {
+        SettingsTabRoute.setPendingTab(tab)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
+        NotificationCenter.default.post(
+            name: SettingsTabRoute.notificationName,
+            object: tab.rawValue
+        )
     }
 }
 

@@ -34,14 +34,29 @@ final class ScratchpadPanelController {
         panel.isOpaque = true
         panel.hasShadow = true
         panel.tabbingMode = .disallowed
+        // Drag the window by any non-interactive area (gaps between toolbar
+        // icons, empty sidebar space, status bar). SwiftUI buttons keep their
+        // own hit regions; everything else falls through to the window.
+        panel.isMovableByWindowBackground = true
         panel.center()
     }
 
-    func show(using settingsStore: SettingsStore) {
+    func show(using settingsStore: SettingsStore, insertingText: String? = nil) {
         NSApp.setActivationPolicy(.regular)
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
         NSApp.setActivationPolicy(settingsStore.showInDock ? .regular : .accessory)
+
+        if let insertingText, !insertingText.isEmpty {
+            // Defer one tick so ScratchpadView is mounted and its notification
+            // observer is registered before we post.
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("typeoh.scratchpad.insertText"),
+                    object: insertingText
+                )
+            }
+        }
     }
 }

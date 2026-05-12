@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class NativeTextViewController {
     fileprivate weak var textView: NSTextView?
+    fileprivate var onProgrammaticEdit: (() -> Void)?
 
     var currentText: String? {
         textView?.string
@@ -31,15 +32,31 @@ final class NativeTextViewController {
         textStorage.replaceCharacters(in: range, with: replacement)
         textStorage.endEditing()
         textView.didChangeText()
+        textView.invalidateRenderedText()
 
         let insertionPoint = range.location + (replacement as NSString).length
         textView.setSelectedRange(NSRange(location: insertionPoint, length: 0))
         textView.scrollRangeToVisible(NSRange(location: insertionPoint, length: 0))
+        onProgrammaticEdit?()
     }
 
     func replaceAllText(with replacement: String) {
         guard let textView else { return }
         replaceCharacters(in: NSRange(location: 0, length: textView.string.utf16.count), with: replacement)
+    }
+
+    /// Replace the entire contents with no undo registration. Used by `Clear`.
+    func resetText(to replacement: String) {
+        guard let textView, let textStorage = textView.textStorage else { return }
+        let fullRange = NSRange(location: 0, length: textStorage.length)
+        textStorage.beginEditing()
+        textStorage.replaceCharacters(in: fullRange, with: replacement)
+        textStorage.endEditing()
+        textView.undoManager?.removeAllActions()
+        textView.didChangeText()
+        textView.invalidateRenderedText()
+        textView.setSelectedRange(NSRange(location: (replacement as NSString).length, length: 0))
+        onProgrammaticEdit?()
     }
 }
 
@@ -61,7 +78,10 @@ struct NativeTextView: NSViewRepresentable {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
-        scrollView.drawsBackground = false
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = .textBackgroundColor
+        scrollView.contentView.drawsBackground = true
+        scrollView.contentView.backgroundColor = .textBackgroundColor
 
         let textStorage = NSTextStorage()
         let layoutManager = NSLayoutManager()
@@ -81,57 +101,84 @@ struct NativeTextView: NSViewRepresentable {
         textView.importsGraphics = false
         textView.allowsUndo = true
         textView.usesFindBar = true
-        textView.isContinuousSpellCheckingEnabled = spellingAssistanceEnabled
-        textView.isGrammarCheckingEnabled = grammarAssistanceEnabled
-        textView.isAutomaticSpellingCorrectionEnabled = spellingAssistanceEnabled
-        textView.isAutomaticTextReplacementEnabled = textReplacementEnabled
-        textView.isAutomaticQuoteSubstitutionEnabled = grammarAssistanceEnabled
-        textView.isAutomaticDashSubstitutionEnabled = grammarAssistanceEnabled
+        applyAssistance(to: textView)
         textView.isAutomaticDataDetectionEnabled = true
         textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
         textView.textColor = NSColor.labelColor
+        textView.drawsBackground = true
         textView.backgroundColor = NSColor.textBackgroundColor
         textView.textContainerInset = NSSize(width: 8, height: 10)
         textView.alignment = .natural
         textView.baseWritingDirection = .natural
         textView.delegate = context.coordinator
         textView.string = text
+        context.coordinator.lastSyncedText = text
 
         scrollView.documentView = textView
         controller.textView = textView
         context.coordinator.textView = textView
+
+        // Programmatic edits (AI replace, Clear) re-sync the coordinator's cache so the
+        // next updateNSView pass doesn't see a false "binding drifted" condition.
+        controller.onProgrammaticEdit = { [weak coordinator = context.coordinator] in
+            guard let coordinator, let tv = coordinator.textView else { return }
+            coordinator.lastSyncedText = tv.string
+        }
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = context.coordinator.textView else { return }
 
-        if textView.string != text {
+        // CRITICAL: never assign `textView.string = text` from here.
+        //
+        // SwiftUI re-renders are async. During fast typing the `text` binding lags
+        // behind `textView.string` (the user has typed chars SwiftUI hasn't applied
+        // yet). Re-assigning `string` would drop those keystrokes, blow away the
+        // undo stack, and interrupt IME composition.
+        //
+        // We only react when the *binding* changed independently of the text view —
+        // e.g. SwiftUI parent set text to something new (".clear()" path uses the
+        // controller, not the binding, to avoid this entirely). For safety we
+        // tolerate an out-of-band binding write only when the new value also
+        // differs from the last value we synced *out* of the text view.
+        if text != context.coordinator.lastSyncedText && text != textView.string {
             let preservedSelection = textView.selectedRange()
-            textView.string = text
-            if preservedSelection.location != NSNotFound, NSMaxRange(preservedSelection) <= textView.string.utf16.count {
+            let fullRange = NSRange(location: 0, length: (textView.string as NSString).length)
+            if textView.shouldChangeText(in: fullRange, replacementString: text) {
+                textView.textStorage?.replaceCharacters(in: fullRange, with: text)
+                textView.didChangeText()
+                textView.invalidateRenderedText()
+            }
+            if preservedSelection.location != NSNotFound,
+               NSMaxRange(preservedSelection) <= (textView.string as NSString).length {
                 textView.setSelectedRange(preservedSelection)
             }
+            context.coordinator.lastSyncedText = textView.string
         }
 
         if selectedRange.location != NSNotFound,
            selectedRange != textView.selectedRange(),
-           NSMaxRange(selectedRange) <= textView.string.utf16.count {
+           NSMaxRange(selectedRange) <= (textView.string as NSString).length {
             textView.setSelectedRange(selectedRange)
         }
 
+        applyAssistance(to: textView)
+        controller.textView = textView
+    }
+
+    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
+        coordinator.controller.onProgrammaticEdit = nil
+        coordinator.controller.textView = nil
+    }
+
+    private func applyAssistance(to textView: NSTextView) {
         textView.isContinuousSpellCheckingEnabled = spellingAssistanceEnabled
         textView.isGrammarCheckingEnabled = grammarAssistanceEnabled
         textView.isAutomaticSpellingCorrectionEnabled = spellingAssistanceEnabled
         textView.isAutomaticTextReplacementEnabled = textReplacementEnabled
         textView.isAutomaticQuoteSubstitutionEnabled = grammarAssistanceEnabled
         textView.isAutomaticDashSubstitutionEnabled = grammarAssistanceEnabled
-
-        controller.textView = textView
-    }
-
-    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
-        coordinator.controller.textView = nil
     }
 
     @MainActor
@@ -140,6 +187,10 @@ struct NativeTextView: NSViewRepresentable {
         @Binding var selectedRange: NSRange
         let controller: NativeTextViewController
         weak var textView: NSTextView?
+        /// The last text value we pushed *out* of the text view. Used by
+        /// `updateNSView` to distinguish "user is typing" (textView ahead of binding)
+        /// from "parent reassigned the binding" (binding ahead of textView).
+        var lastSyncedText: String = ""
 
         init(text: Binding<String>, selectedRange: Binding<NSRange>, controller: NativeTextViewController) {
             _text = text
@@ -149,13 +200,41 @@ struct NativeTextView: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let textView else { return }
-            text = textView.string
-            selectedRange = textView.selectedRange()
+            let newValue = textView.string
+            lastSyncedText = newValue
+            if text != newValue { text = newValue }
+            textView.invalidateRenderedText()
+            let range = textView.selectedRange()
+            if selectedRange != range { selectedRange = range }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
             guard let textView else { return }
-            selectedRange = textView.selectedRange()
+            let range = textView.selectedRange()
+            Task { @MainActor [weak self] in
+                guard let self, self.textView != nil else { return }
+                if self.selectedRange != range { self.selectedRange = range }
+            }
         }
+    }
+}
+
+private extension NSTextView {
+    @MainActor
+    func invalidateRenderedText() {
+        if let layoutManager, let textContainer {
+            layoutManager.ensureLayout(for: textContainer)
+            layoutManager.invalidateDisplay(forCharacterRange: NSRange(location: 0, length: string.utf16.count))
+        }
+
+        invalidateIntrinsicContentSize()
+        needsDisplay = true
+        superview?.needsDisplay = true
+
+        guard let scrollView = enclosingScrollView else { return }
+        scrollView.contentView.needsDisplay = true
+        scrollView.documentView?.needsDisplay = true
+        scrollView.needsDisplay = true
+        scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 }

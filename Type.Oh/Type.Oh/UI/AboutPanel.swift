@@ -81,8 +81,9 @@ private struct AboutPanelContent: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Hotkeys")
                     .font(.headline)
-                hotkeyRow("⌃F13", label: "Voice Dictation")
-                hotkeyRow("⌥F13", label: "AI Editor")
+                hotkeyRow("F13", label: "Voice Dictation")
+                hotkeyRow("F14", label: "AI Editor")
+                hotkeyRow("F15", label: "LazyPad")
             }
 
             Divider()

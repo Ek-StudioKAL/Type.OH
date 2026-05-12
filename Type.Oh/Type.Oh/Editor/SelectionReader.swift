@@ -1,18 +1,43 @@
 import AppKit
 import ApplicationServices
 
+/// What the reader managed to capture from the foreground app.
+struct CapturedSelection {
+    /// The selected text, or nil if nothing was selected / accessible.
+    let text: String?
+    /// True when AX reports the focused element will accept a paste
+    /// (i.e. `kAXSelectedTextAttribute` is settable). When false, ReType
+    /// should redirect to LazyPad instead of trying to paste back.
+    let isEditable: Bool
+}
+
 @MainActor
 final class SelectionReader {
 
-    func readSelectedText(from app: NSRunningApplication?) async -> String? {
-        if let text = readViaAX(from: app) { return text }
-        return await readViaCopy(from: app)
+    func readSelectedText(from app: NSRunningApplication?) async -> CapturedSelection {
+        let axResult = readViaAX(from: app)
+        if let text = axResult.text {
+            return CapturedSelection(text: text, isEditable: axResult.isEditable)
+        }
+
+        // AX gave us nothing. Try the clipboard fallback. We can't reliably know
+        // editability without AX, so we assume editable=false to be safe (route
+        // to LazyPad) unless AX *positively* confirmed editability.
+        let copied = await readViaCopy(from: app)
+        return CapturedSelection(text: copied, isEditable: axResult.isEditable)
     }
 
     // MARK: - AX path
 
-    private func readViaAX(from app: NSRunningApplication?) -> String? {
-        guard AXIsProcessTrusted(), let app else { return nil }
+    private struct AXReadResult {
+        let text: String?
+        let isEditable: Bool
+    }
+
+    private func readViaAX(from app: NSRunningApplication?) -> AXReadResult {
+        guard AXIsProcessTrusted(), let app else {
+            return AXReadResult(text: nil, isEditable: false)
+        }
 
         let axApp = AXUIElementCreateApplication(app.processIdentifier)
 
@@ -20,17 +45,31 @@ final class SelectionReader {
         let focusError = AXUIElementCopyAttributeValue(axApp, kAXFocusedUIElementAttribute as CFString, &focusedRef)
         guard focusError == .success, let focusedRef else {
             NSLog("[Type.OH] AX focusedElement error: %d", focusError.rawValue)
-            return nil
+            return AXReadResult(text: nil, isEditable: false)
         }
 
+        // Use a safe cast — AXUIElementCreateApplication etc. return AXUIElementRef
+        // typed as CFTypeRef. A force-cast crashes the app if the system ever
+        // hands back a wrapper of a different concrete type (seen on some
+        // Catalyst surfaces and PDF viewers).
+        guard CFGetTypeID(focusedRef) == AXUIElementGetTypeID() else {
+            NSLog("[Type.OH] AX focusedElement returned non-element type")
+            return AXReadResult(text: nil, isEditable: false)
+        }
         let focused = focusedRef as! AXUIElement // swiftlint:disable:this force_cast
+
+        var settable: DarwinBoolean = false
+        AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString, &settable)
+        let editable = settable.boolValue
 
         var selectedRef: CFTypeRef?
         let selError = AXUIElementCopyAttributeValue(focused, kAXSelectedTextAttribute as CFString, &selectedRef)
         if selError != .success {
             NSLog("[Type.OH] AX selectedText error: %d", selError.rawValue)
         }
-        return selectedRef as? String
+        let text = selectedRef as? String
+        let nonEmpty = (text?.isEmpty == false) ? text : nil
+        return AXReadResult(text: nonEmpty, isEditable: editable)
     }
 
     // MARK: - Clipboard fallback (⌘C)

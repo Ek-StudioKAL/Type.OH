@@ -35,9 +35,9 @@ actor WhisperService {
         var errorDescription: String? {
             switch self {
             case .modelNotLoaded:
-                "No Whisper model loaded. Download one in Settings → Models."
+                "No Whisper model loaded. Download one in Settings → Whisper."
             case .modelNotDownloaded(let name):
-                "Whisper model '\(name)' isn't downloaded yet. Open Settings → Models to download it."
+                "Whisper model '\(name)' isn't downloaded yet. Open Settings → Whisper to download it."
             }
         }
     }

@@ -5,10 +5,22 @@ struct HotkeyConfig: Codable, Equatable, Sendable {
     var keyCode: UInt32
     var modifiers: UInt32
 
-    // ⌃F13 — controlKey = 4096, F13 keyCode = 105
-    static let defaultVoice  = HotkeyConfig(keyCode: 105, modifiers: 4096)
-    // ⌥F13 — optionKey  = 2048, F13 keyCode = 105
-    static let defaultEditor = HotkeyConfig(keyCode: 105, modifiers: 2048)
+    // Extended F-keys F13 (105), F14 (107), F15 (113) make great global
+    // shortcuts — almost no app uses them and they're chord-free.
+    static let defaultVoice      = HotkeyConfig(keyCode: 105, modifiers: 0) // F13
+    static let defaultEditor     = HotkeyConfig(keyCode: 107, modifiers: 0) // F14
+    static let defaultScratchpad = HotkeyConfig(keyCode: 113, modifiers: 0) // F15
+}
+
+struct CustomStylePreset: Codable, Identifiable, Equatable, Sendable {
+    var id: String
+    var label: String
+    var emoji: String
+    var promptFragment: String
+
+    /// Sidebar can hold up to this many custom presets (alongside the 5
+    /// built-ins). Enforced at the UI/save layer.
+    static let maxCount = 8
 }
 
 enum ProviderID: String, Codable, CaseIterable, Sendable {
@@ -29,13 +41,41 @@ enum ProviderID: String, Codable, CaseIterable, Sendable {
     var requiresAPIKey: Bool { self != .appleOnDevice }
 }
 
+/// Which engine handles the Translate action across the app.
+enum TranslationProviderID: String, Codable, CaseIterable, Sendable {
+    /// Native macOS TranslationSession — no LLM, downloadable language
+    /// packs, runs fully offline.
+    case nativeOS    = "nativeOS"
+    /// Apple FoundationModels (on-device LLM). Higher quality, slower.
+    case localLLM    = "localLLM"
+    /// Whatever cloud provider (`SettingsStore.activeProvider`) the user
+    /// has configured.
+    case apiLLM      = "apiLLM"
+
+    var displayName: String {
+        switch self {
+        case .nativeOS: "Native macOS (offline)"
+        case .localLLM: "Apple On-Device LLM"
+        case .apiLLM:   "Cloud Provider (API key)"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .nativeOS: "Uses macOS Translation. Fast, offline, limited languages, no AI rewrite — but may sound stiffer."
+        case .localLLM: "Uses Apple's on-device language model. Free, private, slower than Native OS."
+        case .apiLLM:   "Uses your selected cloud provider — best quality, costs API credits."
+        }
+    }
+}
+
 @Observable
 @MainActor
 final class SettingsStore {
     var whisperModel:    String        = "openai_whisper-base"
     var voiceHotkey:     HotkeyConfig  = .defaultVoice
     var editorHotkey:    HotkeyConfig  = .defaultEditor
-    var scratchpadHotkey: HotkeyConfig? = nil
+    var scratchpadHotkey: HotkeyConfig? = .defaultScratchpad
     var activeProvider:  ProviderID    = .appleOnDevice
     var sourceLanguage:  String?       = nil     // nil = auto-detect
     var targetLanguage:  String        = "en"
@@ -46,6 +86,10 @@ final class SettingsStore {
     var launchAtLogin:   Bool          = false
     var showInDock:      Bool          = true
     var hasCompletedOnboarding: Bool   = false
+    var customStylePresets: [CustomStylePreset] = []
+    // Translation framework — picks which engine handles the Translate flow.
+    // `nil` means "ask me on first use" (auto-open Settings → Translation).
+    var translationProvider: TranslationProviderID? = nil
 
     private let fileURL: URL
 
@@ -87,6 +131,8 @@ private extension SettingsStore {
         var smartTextEnabled: Bool?
         var showInDock: Bool?
         var hasCompletedOnboarding: Bool?
+        var customStylePresets: [CustomStylePreset]?
+        var translationProvider: TranslationProviderID?
 
         init(_ s: SettingsStore) {
             whisperModel   = s.whisperModel
@@ -104,6 +150,8 @@ private extension SettingsStore {
             launchAtLogin  = s.launchAtLogin
             showInDock     = s.showInDock
             hasCompletedOnboarding = s.hasCompletedOnboarding
+            customStylePresets = s.customStylePresets
+            translationProvider = s.translationProvider
         }
 
         func apply(to s: SettingsStore) {
@@ -128,6 +176,8 @@ private extension SettingsStore {
             s.launchAtLogin  = launchAtLogin
             s.showInDock     = showInDock ?? true
             s.hasCompletedOnboarding = hasCompletedOnboarding ?? false
+            s.customStylePresets = customStylePresets ?? []
+            s.translationProvider = translationProvider
         }
     }
 }

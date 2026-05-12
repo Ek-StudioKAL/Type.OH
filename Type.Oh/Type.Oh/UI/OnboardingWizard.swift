@@ -13,7 +13,7 @@ struct OnboardingWizard: View {
     @State private var manager = ModelManager.shared
     @State private var voiceHotkeyDraft = HotkeyConfig.defaultVoice
     @State private var editorHotkeyDraft = HotkeyConfig.defaultEditor
-    @State private var scratchpadHotkeyDraft: HotkeyConfig? = nil
+    @State private var scratchpadHotkeyDraft: HotkeyConfig? = .defaultScratchpad
     @State private var hotkeyError: String?
     @State private var loadedHotkeyDrafts = false
 
@@ -198,13 +198,18 @@ private struct WelcomeStep: View {
 
             featureRow(
                 icon: "mic.fill",
-                title: "⌃F13 — Voice to text",
+                title: "F13 — Voice to text",
                 detail: "Hold the hotkey, speak, release. Transcribed locally and pasted at your cursor."
             )
             featureRow(
                 icon: "wand.and.sparkles",
-                title: "⌥F13 — AI editor",
+                title: "F14 — AI editor",
                 detail: "Select text in any app, press the hotkey, fix / restyle / translate, then apply."
+            )
+            featureRow(
+                icon: "note.text",
+                title: "F15 — LazyPad",
+                detail: "Open your scratchpad workspace for longer edits and reusable style presets."
             )
 
             Text("This wizard takes about a minute.")
@@ -481,7 +486,7 @@ private struct ModelStep: View {
                 Text(err).font(.caption).foregroundStyle(.red)
             }
 
-            Text("You can change or download additional models later in Settings → Models.")
+            Text("You can change or download additional models later in Settings → Whisper.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.top, 6)
@@ -559,8 +564,13 @@ private struct KeychainNoticeStep: View {
 
 private struct ProviderStep: View {
     @Environment(SettingsStore.self) private var settings
-    @State private var storedKeys: [ProviderID: String] = [:]
+    /// Presence is queried via `KeychainStore.hasKey` — metadata only, no
+    /// password prompt. Setup wizard opens without bothering the user.
+    @State private var keyPresent: [ProviderID: Bool] = [:]
     @State private var draftKeys:  [ProviderID: String] = [:]
+    /// Last-4 of the actual key, only populated for keys the user explicitly
+    /// taps Reveal on or for keys they just saved in this session.
+    @State private var revealedSuffix: [ProviderID: String] = [:]
 
     var body: some View {
         @Bindable var settings = settings
@@ -578,24 +588,29 @@ private struct ProviderStep: View {
                 providerRow(p)
             }
 
-            Text("You can add or change keys later in Settings → Providers.")
+            Text("You can add or change keys later in Settings → Providers. Tap \"Always Allow\" on the macOS prompt to skip future authorizations.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.top, 6)
         }
-        .onAppear { loadKeys() }
+        .onAppear { refreshPresence() }
     }
 
     @ViewBuilder
     private func providerRow(_ p: ProviderID) -> some View {
-        let stored = storedKeys[p]
+        let present = keyPresent[p] ?? false
+        let suffix  = revealedSuffix[p]
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(p.displayName).font(.body.weight(.medium))
                 Spacer()
-                if stored != nil {
-                    Text("••••" + String(stored!.suffix(4)))
+                if let suffix {
+                    Text("••••" + suffix)
                         .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                } else if present {
+                    Text("Configured")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -608,16 +623,26 @@ private struct ProviderStep: View {
                     let key = (draftKeys[p] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !key.isEmpty else { return }
                     if KeychainStore.save(key: key, for: p) {
-                        storedKeys[p] = key
+                        keyPresent[p] = true
+                        revealedSuffix[p] = String(key.suffix(4))
                         draftKeys[p] = ""
                     }
                 }
                 .buttonStyle(.bordered)
                 .disabled((draftKeys[p] ?? "").isEmpty)
-                if stored != nil {
+                if present, suffix == nil {
+                    Button("Reveal") {
+                        if let key = KeychainStore.load(for: p) {
+                            revealedSuffix[p] = String(key.suffix(4))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+                if present {
                     Button("Clear") {
                         KeychainStore.delete(for: p)
-                        storedKeys[p] = nil
+                        keyPresent[p] = false
+                        revealedSuffix[p] = nil
                     }
                     .buttonStyle(.bordered)
                 }
@@ -626,9 +651,9 @@ private struct ProviderStep: View {
         .padding(.vertical, 4)
     }
 
-    private func loadKeys() {
+    private func refreshPresence() {
         for p in ProviderID.allCases where p.requiresAPIKey {
-            storedKeys[p] = KeychainStore.load(for: p)
+            keyPresent[p] = KeychainStore.hasKey(for: p)
         }
     }
 }
