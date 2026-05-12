@@ -48,15 +48,14 @@ final class SelectionReader {
             return AXReadResult(text: nil, isEditable: false)
         }
 
-        // Use a safe cast — AXUIElementCreateApplication etc. return AXUIElementRef
-        // typed as CFTypeRef. A force-cast crashes the app if the system ever
-        // hands back a wrapper of a different concrete type (seen on some
-        // Catalyst surfaces and PDF viewers).
+        // AXUIElementCreateApplication etc. return AXUIElementRef typed as
+        // CFTypeRef. Verify the CoreFoundation type before bridging so unusual
+        // Catalyst/PDF surfaces fail closed instead of trapping.
         guard CFGetTypeID(focusedRef) == AXUIElementGetTypeID() else {
             NSLog("[Type.OH] AX focusedElement returned non-element type")
             return AXReadResult(text: nil, isEditable: false)
         }
-        let focused = focusedRef as! AXUIElement // swiftlint:disable:this force_cast
+        let focused = unsafeBitCast(focusedRef, to: AXUIElement.self)
 
         var settable: DarwinBoolean = false
         AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString, &settable)

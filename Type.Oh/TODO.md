@@ -10,7 +10,7 @@ Previous sessions: menu redesign, dock toggle, toast errors, API-key fix, AX rea
 
 ## P0 — Blockers from live testing (2026-05-12)
 
-### 1. LazyPad: typing lag + overwrite during fast input
+### 1. LazyPad: typing lag + overwrite during fast input ✅
 
 **Symptom (reported):** Autocomplete is laggy and *sometimes overwrites text while the user is typing*. After a few lines / a paragraph, the input window "goes crazy" — characters disappear or shift and the change can't be reverted.
 
@@ -25,17 +25,18 @@ if textView.string != text {
 
 SwiftUI re-renders are async, so during fast typing the `text` binding can lag behind `textView.string` (the user has typed more chars than SwiftUI has propagated). When `updateNSView` runs it sees a "mismatch" and destructively re-assigns `textView.string = text` — clobbering in-flight keystrokes, IME composition, and undo history.
 
-**Fix:** Convert this to a one-way data flow:
-- Add a `programmaticUpdateInProgress` flag (or seq-no) on the coordinator/controller.
-- Only push from SwiftUI → NSTextView when the change *originated outside the text view* (e.g. AI replace via `NativeTextViewController.replaceCharacters`, or `Clear` action). User keystrokes propagate the *other* way only.
-- Use `textStorage.replaceCharacters(in:with:)` + `shouldChangeText` for programmatic updates so undo and selection are preserved.
+**Shipped:** `NativeTextView.updateNSView` no longer assigns `textView.string = text` during normal SwiftUI refreshes. The coordinator tracks `lastSyncedText`, programmatic edits resync that cache, and out-of-band binding writes use `textStorage.replaceCharacters(in:with:)` behind `shouldChangeText`. This preserves in-flight typing, selection, IME composition, and undo history.
 
 **Files:** `Type.Oh/UI/NativeTextView.swift`, `Type.Oh/UI/ScratchpadView.swift`.
 **Model: Opus 4.7.**
 
-### 2. LazyPad: long text becomes unrevertable
+### 2. LazyPad: long text becomes unrevertable ✅
 
-Same root cause as #1 — once `textView.string =` runs, the undo stack is dropped and the scroll/selection state is reset. After #1 lands, manually verify:
+Same root cause as #1 — once `textView.string =` runs, the undo stack is dropped and the scroll/selection state is reset.
+
+**Shipped:** same `NativeTextView` rewrite as #1. Programmatic replacements now go through text storage and the bridge no longer clobbers the document on render passes. Also fixed the stale/ghost-line redraw issue by making the scroll view, clip view, and text view draw opaque text backgrounds and explicitly invalidating layout/display after text changes.
+
+Manual verification still useful before release:
 
 - Undo (⌘Z) restores characters after AI replace.
 - Scroll position stays anchored during AI rewrite.
@@ -44,7 +45,7 @@ Same root cause as #1 — once `textView.string =` runs, the undo stack is dropp
 **Files:** same as #1.
 **Model: Sonnet 4.6.**
 
-### 3. ReType crashes on uneditable selection — should fall through to LazyPad
+### 3. ReType crashes on uneditable selection — should fall through to LazyPad ✅
 
 **Symptom:** Invoking ReType while text is selected in a *non-editable* surface (web view static text, PDF, image OCR, etc.) crashes the app.
 
@@ -52,10 +53,10 @@ Same root cause as #1 — once `textView.string =` runs, the undo stack is dropp
 - `SelectionReader.readViaAX` has `let focused = focusedRef as! AXUIElement` — force cast traps if AX returns an unexpected type.
 - After the ReType panel applies its result, `PasteService.paste` posts ⌘V into a target that has no editable focus — paste may silently fail, but the bigger UX bug is that the user can't *use* the rewrite.
 
-**Fix:**
-1. Replace the force-cast with a safe cast that returns `nil` (no crash on edge cases).
-2. Detect uneditability at capture time: check `AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute)` (or fall back to "no AX selection, but clipboard copy produced text"). When uneditable, route the selection to **LazyPad** with the text pre-loaded instead of opening the ReType compact panel.
-3. Same routing also applies to "no editable focus at all" — LazyPad becomes the safe landing pad.
+**Shipped:**
+1. `SelectionReader` now verifies the focused AX value's CoreFoundation type before bridging it, so unexpected AX objects fail closed instead of trapping.
+2. Capture now returns `CapturedSelection(text:isEditable:)`; editability is based on `AXUIElementIsAttributeSettable(..., kAXSelectedTextAttribute, ...)`.
+3. `AppDelegate` routes non-editable captured text into LazyPad with a toast instead of opening ReType and attempting to paste back into an uneditable surface.
 
 **Files:** `Type.Oh/Editor/SelectionReader.swift`, `Type.Oh/AppDelegate.swift`, possibly add a helper to `Core/FocusCapture.swift`.
 **Model: Opus 4.7.**
@@ -69,16 +70,15 @@ Same root cause as #1 — once `textView.string =` runs, the undo stack is dropp
 **Symptom (reported):** "Translation function needs improvements in the UI scope."
 
 **Current state:**
-- `LanguagePicker` is two NSMenu buttons → flat list of *every* locale identifier, no search.
-- In `AIEditorPanel` it sits awkwardly under the mode tabs.
-- In `ScratchpadView` it's behind a popover where the action button can clip below the screen on smaller displays.
+- `LanguagePicker` is now searchable and uses custom popovers instead of flat NSMenu lists.
+- Source/target swap is implemented.
+- Native macOS offline translation filters the source/target lists to `LanguageAvailability.supportedLanguages`.
+- ReType and LazyPad both use the same language picker surface.
 
-**Fix:**
-- Searchable language picker with a TextField filter on top.
+**Remaining polish:**
 - "Recent languages" row above the full list (persist 3–5 most-used in `SettingsStore`).
-- Swap-source/target arrow button between the two pickers.
-- Inline translation strip in ReType (chip-style, like style presets), not a popover.
-- LazyPad popover: make the language picker the *primary* surface, action button sticky at the bottom.
+- Consider an inline translation strip in ReType instead of the current toolbar popover.
+- LazyPad popover: make action button sticky at the bottom if clipping appears on smaller displays.
 
 **Files:** `Type.Oh/UI/LanguagePicker.swift`, `Type.Oh/UI/AIEditorPanel.swift`, `Type.Oh/UI/ScratchpadView.swift`, `Type.Oh/Core/SettingsStore.swift` (recents persistence).
 **Model: Sonnet 4.6.**
@@ -113,6 +113,22 @@ Net effect: with "Always Allow" ticked, zero prompts ever. Without it, one promp
 
 Shipped this session — `HotkeyRecorderButton` was using NSButton's `keyDown`/`performKeyEquivalent` path, which only reliably fires for Cmd-modified events. Replaced with an `NSEvent.addLocalMonitorForEvents` monitor during recording so every key event is captured at the app level regardless of NSButton's routing.
 
+### 10. Hotkey defaults app-wide ✅
+
+Shipped — visible default hotkeys now consistently show `F13` for Dictate, `F14` for ReType, and `F15` for LazyPad across onboarding, About, and Settings. Reset Defaults restores all three defaults, including LazyPad's `F15`, instead of disabling it.
+
+### 11. LLM prompt leakage cleanup ✅
+
+Shipped — removed the brittle language-preservation policy sentence from the shared rewrite prompt and added `cleanTextAIOutput(_:)` for every provider (Apple on-device, Anthropic, OpenAI, Gemini). The sanitizer strips leaked policy lines before results reach the UI. Covered by `TextAIProviderTests`.
+
+### 12. README + screenshots ✅
+
+Shipped — refreshed `README.md` with current setup, workflows, hotkeys, translation notes, and screenshots from `screenshots/`.
+
+### 13. Provider sidebar icons ✅
+
+Shipped — LazyPad provider rows use the custom asset symbols `GPT`, `Claude`, and `Gemini`; Apple on-device uses the SF Symbol `apple.intelligence`.
+
 ---
 
 ## P3 — V2 backlog
@@ -134,19 +150,15 @@ Shipped — `SettingsTabRoute.open(...) + AppDelegate.sendAction(showSettingsWin
 
 Shipped — `Type.Oh/UI/NativeTranslationDriver.swift` is a hidden SwiftUI driver that bridges the imperative `TranslationDispatcher.translate(.nativeOS, ...)` call into the SwiftUI `.translationTask(_:)` API. `NativeTranslationCoordinator` (Observable singleton) parks a continuation while the driver runs `session.translate(text)`; a `generation` counter re-fires the task even when the configuration is byte-identical. Mounted as a 0×0 background overlay in both LazyPad (`ScratchpadView`) and ReType (`AIEditorPanel`). `TranslationDispatcher` signature now carries `Locale.Language` directly so the configuration can be constructed natively. Removed the `nativeNotYetImplemented` placeholder; added `nativeMissingLanguagePack` for the genuine "no installed pack" case.
 
-### ReType styling parity with new LazyPad
+### ReType styling parity with new LazyPad ✅
 
-ReType (`AIEditorPanel`) still uses the old compact-panel look. Mirror LazyPad's chrome: roomier spacing, inline translate (already done), match status-bar accent, possibly a slim sidebar for style chips. Decide whether to share the sidebar/toolbar primitives between the two views.
-- **Files:** `Type.Oh/UI/AIEditorPanel.swift`, possibly extract shared sidebar/toolbar into `UI/Components/`.
-- **Model: Sonnet 4.6.**
+Shipped — `AIEditorPanel` rebuilt around LazyPad's visual idioms:
+- Top toolbar with icon+label buttons (Fix / Style / Translate as mode pills, plus Paste / Copy on the right). The active mode lights up in the accent color (matching LazyPad's sidebar selection).
+- Mode tabs removed in favor of toolbar mode buttons; the style chip row only appears when Style mode is active.
+- Input rendered as a "card" (rounded rect, secondary tint, 1pt stroke) — identical chrome to LazyPad's editor frame. Result card uses the accent tint + accent stroke so it visually pops as the "applied" surface.
+- Errors moved into a dedicated red-tinted banner (with the "API key missing" CTA buttons preserved).
+- Status bar at the bottom mirrors LazyPad: character count + mode label on the left, provider + translation pair in the middle, status/error on the right.
+- Translate language picker moved into a popover triggered from the toolbar (with right-click context menu for swap / reset to auto-detect, matching LazyPad).
+- Native translation driver mounted as `.background()` (same pattern as LazyPad).
 
-### Google Translate without API key
-
-User asked about a no-API Google Translate fallback. The only viable approach without an API key is scraping the free web endpoint, which is brittle (rate limits, terms of service, CAPTCHA exposure). Skip for now and surface DeepL Free as a cleaner alternative if budget allows.
-- **Model: Opus 4.7** when revisited — needs reliability research and ToS review first.
-
-### Cloud-provider model picker
-
-Users currently can't pick Claude Haiku vs Sonnet, GPT-4o-mini vs 4o, etc. Add `selectedModel: [ProviderID: String]` to `SettingsStore` and a picker per provider in Settings → Providers. Wire through each provider's request builder.
-- **Files:** `SettingsStore.swift`, `Editor/TextAI/*.swift`, `SettingsWindow.swift`.
-- **Model: Sonnet 4.6.**
+Toolbar primitive is duplicated locally (`toolbarButton(title:systemImage:isActive:)`) rather than extracted to `UI/Components/` — the two views' buttons diverge enough on active-state behavior that a shared abstraction would be premature. Revisit if a third surface needs the same chrome.
