@@ -8,16 +8,6 @@ Type.OH is a native macOS writing and dictation utility for moving quickly betwe
 - `ReType`: a selected-text popup for fixing, restyling, and translating text from other apps.
 - `Dictate`: hold-to-record speech transcription with local Whisper models.
 
-## Screenshots
-
-![Menu bar menu](screenshots/menubar_menu.png)
-
-![ReType popup window](screenshots/ReTypo_popup_window.png)
-
-![ReType translation window](screenshots/ReTypo_popup_window_translation.png)
-
-![LazyPad window](screenshots/SketchPad-LazyPad-window.png)
-
 ## Requirements
 
 - macOS with Xcode installed.
