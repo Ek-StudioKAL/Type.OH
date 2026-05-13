@@ -45,7 +45,6 @@ struct ScratchpadView: View {
     @State private var statusIsError = false
     @State private var sourceLanguage: Locale.Language? = nil
     @State private var targetLanguage = Locale.Language(identifier: "en")
-    @State private var isShowingTranslationPopover = false
     @State private var hasLoadedTranslationSettings = false
     @State private var isSidebarVisible = true
     @State private var residentMemoryLabel = MemoryReporter.residentDisplayString()
@@ -476,15 +475,14 @@ struct ScratchpadView: View {
             .disabled(isProcessing || text.isEmpty)
 
             toolbarButton(title: "Translate", systemImage: "translate") {
-                isShowingTranslationPopover.toggle()
+                runAction(.translate)
             }
             .disabled(isProcessing || text.isEmpty)
+            .help(currentLanguagePairLabel + " — change defaults in Settings → Translation")
             .contextMenu {
                 Text(currentLanguagePairLabel)
                 Divider()
-                Button("Configure languages…") {
-                    isShowingTranslationPopover = true
-                }
+                Button("Translate Now") { runAction(.translate) }
                 if sourceLanguage != nil {
                     Button("Swap source ⇄ target") {
                         if let src = sourceLanguage {
@@ -493,58 +491,14 @@ struct ScratchpadView: View {
                             persistTranslationSettings()
                         }
                     }
-                }
-                if sourceLanguage != nil {
                     Button("Reset source to auto-detect") {
                         sourceLanguage = nil
                         persistTranslationSettings()
                     }
                 }
-            }
-            .popover(isPresented: $isShowingTranslationPopover, arrowEdge: .bottom) {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "translate")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color.accentColor)
-                        Text("Translate")
-                            .font(.headline)
-                        Spacer()
-                    }
-
-                    LanguagePicker(
-                        sourceLanguage: $sourceLanguage,
-                        targetLanguage: $targetLanguage,
-                        compact: false,
-                        availability: settings.translationProvider == .nativeOS ? .nativeOSOffline : .allLocaleLanguages
-                    )
-                    .onChange(of: sourceLanguage) { persistTranslationSettings() }
-                    .onChange(of: targetLanguage) { persistTranslationSettings() }
-
-                    Text(translationScopeHint)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    HStack {
-                        Button("Cancel") {
-                            isShowingTranslationPopover = false
-                        }
-                        .buttonStyle(.bordered)
-                        .keyboardShortcut(.escape)
-
-                        Spacer()
-
-                        Button("Translate") {
-                            isShowingTranslationPopover = false
-                            runAction(.translate)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .keyboardShortcut(.return)
-                        .disabled(isProcessing || text.isEmpty)
-                    }
+                Button("Open Translation Settings…") {
+                    openSettingsAt(.translation)
                 }
-                .padding(16)
-                .frame(width: 360)
             }
 
             Spacer(minLength: 12)
@@ -605,7 +559,7 @@ struct ScratchpadView: View {
     @ViewBuilder
     private func toolbarButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            toolbarLabel(title: title, systemImage: systemImage)
+            AccentToolbarLabel(title: title, systemImage: systemImage)
         }
         .buttonStyle(.plain)
     }
@@ -616,34 +570,9 @@ struct ScratchpadView: View {
     @ViewBuilder
     private func toolbarButton(title: String, literalGlyph: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                Text(literalGlyph)
-                    .font(.system(size: 17, weight: .regular))
-                    .frame(width: 28, height: 22)
-                Text(title)
-                    .font(.caption2)
-                    .lineLimit(1)
-            }
-            .frame(width: 62)
-            .foregroundStyle(.primary)
-            .contentShape(Rectangle())
+            AccentToolbarLabel(title: title, systemImage: "", literalGlyph: literalGlyph)
         }
         .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private func toolbarLabel(title: String, systemImage: String) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: systemImage)
-                .font(.system(size: 17, weight: .regular))
-                .frame(width: 28, height: 22)
-            Text(title)
-                .font(.caption2)
-                .lineLimit(1)
-        }
-        .frame(width: 62)
-        .foregroundStyle(.primary)
-        .contentShape(Rectangle())
     }
 
     private func providerSymbol(for provider: ProviderID) -> String {
@@ -755,19 +684,16 @@ struct ScratchpadView: View {
             emoji: preset.emoji,
             promptFragment: preset.promptFragment
         )
-        Button {
+        SidebarHoverRow {
             runAction(.style(bridged))
-        } label: {
+        } content: {
             HStack(spacing: 10) {
                 Text(preset.emoji)
                     .frame(width: 18)
                 Text(preset.label)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
         }
-        .buttonStyle(.plain)
         .disabled(isProcessing || text.isEmpty)
     }
 
@@ -784,7 +710,7 @@ struct ScratchpadView: View {
 
     @ViewBuilder
     private func sidebarButton(title: String, systemImage: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        SidebarHoverRow(isSelected: isSelected, action: action) {
             HStack(spacing: 10) {
                 Image(systemName: systemImage)
                     .frame(width: 18)
@@ -792,41 +718,28 @@ struct ScratchpadView: View {
                     .fontWeight(isSelected ? .semibold : .regular)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
-            )
         }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
     private func sidebarProviderButton(_ provider: ProviderID) -> some View {
-        Button {
+        let isSelected = settings.activeProvider == provider
+        SidebarHoverRow(isSelected: isSelected) {
             settings.activeProvider = provider
             settings.save()
-        } label: {
+        } content: {
             HStack(spacing: 10) {
                 providerSidebarIcon(for: provider)
                     .frame(width: 18, height: 18)
                 Text(providerMenuTitle(for: provider))
-                    .fontWeight(settings.activeProvider == provider ? .semibold : .regular)
+                    .fontWeight(isSelected ? .semibold : .regular)
                 Spacer(minLength: 0)
-                if settings.activeProvider == provider {
+                if isSelected {
                     Image(systemName: "checkmark")
                         .font(.caption.weight(.bold))
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(settings.activeProvider == provider ? Color.accentColor.opacity(0.18) : Color.clear)
-            )
         }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder

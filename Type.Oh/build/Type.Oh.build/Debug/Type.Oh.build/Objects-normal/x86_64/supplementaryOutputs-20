@@ -1,0 +1,23 @@
+{
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/AppDelegate.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AppDelegate.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AppDelegate.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AppDelegate.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AppDelegate.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AppDelegate.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/Type_OhApp.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/Type_OhApp.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/Type_OhApp.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/Type_OhApp.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/Type_OhApp.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/Type_OhApp.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/GeneratedAssetSymbols.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/GeneratedAssetSymbols.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/GeneratedAssetSymbols.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/GeneratedAssetSymbols.swiftdeps"
+  }
+}

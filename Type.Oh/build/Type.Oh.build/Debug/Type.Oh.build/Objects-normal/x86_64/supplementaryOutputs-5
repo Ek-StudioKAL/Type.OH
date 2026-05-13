@@ -1,0 +1,30 @@
+{
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/Editor/TranslationDispatcher.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/TranslationDispatcher.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/TranslationDispatcher.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/TranslationDispatcher.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/TranslationDispatcher.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/TranslationDispatcher.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/AIEditorPanel.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AIEditorPanel.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AIEditorPanel.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AIEditorPanel.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AIEditorPanel.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AIEditorPanel.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/AboutPanel.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AboutPanel.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AboutPanel.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AboutPanel.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AboutPanel.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/AboutPanel.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/DiffTextView.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/DiffTextView.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/DiffTextView.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/DiffTextView.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/DiffTextView.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/DiffTextView.swiftdeps"
+  }
+}

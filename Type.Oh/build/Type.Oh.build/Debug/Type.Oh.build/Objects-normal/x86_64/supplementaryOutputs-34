@@ -1,0 +1,30 @@
+{
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/LanguagePicker.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/LanguagePicker.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/LanguagePicker.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/LanguagePicker.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/LanguagePicker.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/LanguagePicker.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/MenuBarContent.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/MenuBarContent.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/MenuBarContent.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/MenuBarContent.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/MenuBarContent.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/MenuBarContent.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/ModeTabs.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/ModeTabs.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/ModeTabs.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/ModeTabs.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/ModeTabs.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/ModeTabs.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/NativeTextView.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/NativeTextView.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/NativeTextView.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/NativeTextView.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/NativeTextView.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/x86_64/NativeTextView.swiftdeps"
+  }
+}

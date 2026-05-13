@@ -1,0 +1,30 @@
+{
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/ScratchpadView.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ScratchpadView.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ScratchpadView.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ScratchpadView.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ScratchpadView.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ScratchpadView.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/SettingsWindow.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/SettingsWindow.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/SettingsWindow.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/SettingsWindow.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/SettingsWindow.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/SettingsWindow.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/StyleChipRow.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/StyleChipRow.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/StyleChipRow.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/StyleChipRow.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/StyleChipRow.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/StyleChipRow.swiftdeps"
+  },
+  "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/UI/ToastOverlay.swift" : {
+    "const-values" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ToastOverlay.swiftconstvalues",
+    "dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ToastOverlay.d",
+    "diagnostics" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ToastOverlay.dia",
+    "object" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ToastOverlay.o",
+    "swift-dependencies" : "/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/build/Type.Oh.build/Debug/Type.Oh.build/Objects-normal/arm64/ToastOverlay.swiftdeps"
+  }
+}

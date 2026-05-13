@@ -162,3 +162,19 @@ Shipped — `AIEditorPanel` rebuilt around LazyPad's visual idioms:
 - Native translation driver mounted as `.background()` (same pattern as LazyPad).
 
 Toolbar primitive is duplicated locally (`toolbarButton(title:systemImage:isActive:)`) rather than extracted to `UI/Components/` — the two views' buttons diverge enough on active-state behavior that a shared abstraction would be premature. Revisit if a third surface needs the same chrome.
+
+---
+
+## Open after 2026-05-13 (UI polish round 2)
+
+### Dictation hotkey HUD (model status, timer, Done, Esc) ✅
+
+Shipped — `UI/RecordingOverlay.swift` is now a SF-Rounded HUD with: pulsing red dot, mm:ss timer, model-loaded badge (matches Settings → Whisper colors), permission badges that only appear when AX or mic auth is missing, and a `Done` capsule button. `DictationHUDState` carries the snapshot of model + permission state computed by `AppDelegate.currentDictationHUDState()` when the panel is shown. AppDelegate installs a process-local `NSEvent` key monitor while the panel is up (`installRecordingKeyMonitor`) so the non-activating panel can still capture Esc (cancel → `cancelVoiceRecording`) and Return / Done (commit → re-enters `handleVoiceKey`). Cancel honors `whisperKeepLoaded`.
+
+### App-launch splash with loading bar (SF Rounded) ✅
+
+Shipped — new files `Core/LaunchBootstrap.swift` (@Observable @MainActor; runs permission-probe, Keychain pre-warm, Whisper model load — bounded by an 8 s soft deadline so a hung step never blocks launch) and `UI/LaunchSplash.swift` (SF Rounded headings, app icon hero, linear `ProgressView` bound to `bootstrap.progress`, dismisses itself ~0.35 s after `isComplete` flips so the bar's completion is visible). `AppDelegate.showLaunchSplash` shows the panel when `hasCompletedOnboarding` is true and starts `bootstrap.run()`; the splash calls back into `hideLaunchSplash` when done. Existing inline pre-warm (Whisper preload + `KeychainStore.prefetch`) was removed from `applicationDidFinishLaunching` — the bootstrap now owns those steps.
+
+**Asset note — next session:** logo currently uses `NSImage.applicationIconName`. To switch to the dedicated SVGs (`TypeOh-Shape - full color.svg` etc. in `~/Type.OH/Splash_screen-ref/`), drag them into `Type.Oh/Assets.xcassets` as a vector image set, then replace the `NSImage(named: …)` lookup in `LaunchSplash.logo`.
+
+**Xcode target note:** the two new files (`Core/LaunchBootstrap.swift` and `UI/LaunchSplash.swift`) need to be added to the `Type.Oh` target in Xcode (drag into Project Navigator under their respective folders, ensure "Add to target: Type.Oh" is ticked). The build won't link them until that's done.

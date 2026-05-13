@@ -23,6 +23,14 @@ actor WhisperService {
         try await loadModel(name: name, at: folderURL)
     }
 
+    /// Drop the WhisperKit instance. Frees model RAM (200 MB – 3 GB depending on
+    /// variant). Next dictation pays a 1-5 s warm-up to reload.
+    func unload() async {
+        whisperKit = nil
+        loadedModel = nil
+        await ModelManager.shared.markUnloaded()
+    }
+
     func transcribe(audio: [Float]) async throws -> String {
         guard let kit = whisperKit else { throw WhisperError.modelNotLoaded }
         let results = try await kit.transcribe(audioArray: audio)

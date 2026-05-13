@@ -9,7 +9,7 @@ struct TypeOhApp: App {
             MenuBarContent()
                 .environment(appDelegate.settingsStore)
         } label: {
-            MenuBarIconLabel(image: menuBarIcon)
+            MenuBarIconLabel()
         }
 
         Settings {
@@ -17,26 +17,17 @@ struct TypeOhApp: App {
                 .environment(appDelegate.settingsStore)
         }
     }
-
-    private var menuBarIcon: NSImage {
-        let icon = NSImage(named: NSImage.applicationIconName) ?? NSApp.applicationIconImage
-        let sized = NSImage(size: NSSize(width: 16, height: 16))
-        sized.lockFocus()
-        if let icon {
-            icon.draw(in: NSRect(x: 0, y: 0, width: 16, height: 16))
-        }
-        sized.unlockFocus()
-        return sized
-    }
 }
 
 private struct MenuBarIconLabel: View {
     @Environment(\.openSettings) private var openSettings
 
-    let image: NSImage
-
     var body: some View {
-        Image(nsImage: image)
+        Image(nsImage: menuBarImage)
+            .resizable()
+            .renderingMode(.original)
+            .scaledToFit()
+            .frame(width: 18, height: 18)
             .help("Type.OH")
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("typeoh.openSettings"))) { _ in
                 openSettingsWindow()
@@ -47,6 +38,18 @@ private struct MenuBarIconLabel: View {
                 }
                 openSettingsWindow()
             }
+    }
+
+    private var menuBarImage: NSImage {
+        let image = NSImage(named: "Menubar")
+            ?? NSImage(named: "menuBarIcon")
+            ?? NSImage(named: "Type.OH-logo")
+            ?? NSImage(named: NSImage.applicationIconName)
+            ?? NSApp.applicationIconImage
+            ?? NSImage()
+        image.isTemplate = false
+        image.size = NSSize(width: 18, height: 18)
+        return image
     }
 
     private func openSettingsWindow() {

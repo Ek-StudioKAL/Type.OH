@@ -1,0 +1,9 @@
+Target dependency graph (4 targets)
+Target 'Type.Oh' in project 'Type.Oh'
+➜ Explicit dependency on target 'WhisperKit' in project 'argmax-oss-swift'
+Target 'WhisperKit' in project 'argmax-oss-swift'
+➜ Explicit dependency on target 'WhisperKit' in project 'argmax-oss-swift'
+➜ Explicit dependency on target 'ArgmaxCore' in project 'argmax-oss-swift'
+Target 'WhisperKit' in project 'argmax-oss-swift'
+➜ Explicit dependency on target 'ArgmaxCore' in project 'argmax-oss-swift'
+Target 'ArgmaxCore' in project 'argmax-oss-swift' (no dependencies)

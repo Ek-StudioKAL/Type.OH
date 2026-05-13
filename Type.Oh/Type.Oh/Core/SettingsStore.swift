@@ -90,6 +90,10 @@ final class SettingsStore {
     // Translation framework — picks which engine handles the Translate flow.
     // `nil` means "ask me on first use" (auto-open Settings → Translation).
     var translationProvider: TranslationProviderID? = nil
+    /// When true (the default), Whisper stays loaded in memory between dictations
+    /// so subsequent ⌃F13 presses are instant. Turn off to free ~200 MB-3 GB
+    /// while idle, at the cost of a 1-5 s warm-up on next use.
+    var whisperKeepLoaded: Bool = true
 
     private let fileURL: URL
 
@@ -133,6 +137,7 @@ private extension SettingsStore {
         var hasCompletedOnboarding: Bool?
         var customStylePresets: [CustomStylePreset]?
         var translationProvider: TranslationProviderID?
+        var whisperKeepLoaded: Bool?
 
         init(_ s: SettingsStore) {
             whisperModel   = s.whisperModel
@@ -152,6 +157,7 @@ private extension SettingsStore {
             hasCompletedOnboarding = s.hasCompletedOnboarding
             customStylePresets = s.customStylePresets
             translationProvider = s.translationProvider
+            whisperKeepLoaded = s.whisperKeepLoaded
         }
 
         func apply(to s: SettingsStore) {
@@ -178,6 +184,7 @@ private extension SettingsStore {
             s.hasCompletedOnboarding = hasCompletedOnboarding ?? false
             s.customStylePresets = customStylePresets ?? []
             s.translationProvider = translationProvider
+            s.whisperKeepLoaded = whisperKeepLoaded ?? true
         }
     }
 }

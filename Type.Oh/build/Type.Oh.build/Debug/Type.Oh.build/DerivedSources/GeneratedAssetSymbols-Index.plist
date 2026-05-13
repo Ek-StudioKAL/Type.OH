@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>colors</key>
+	<array>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameAccentColor</string>
+			<key>relativePath</key>
+			<string>./AccentColor.colorset</string>
+			<key>swiftSymbol</key>
+			<string>accent</string>
+		</dict>
+	</array>
+	<key>images</key>
+	<array/>
+	<key>symbols</key>
+	<array>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameClaude</string>
+			<key>relativePath</key>
+			<string>./Claude.symbolset</string>
+			<key>swiftSymbol</key>
+			<string>claude</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameGPT</string>
+			<key>relativePath</key>
+			<string>./GPT.symbolset</string>
+			<key>swiftSymbol</key>
+			<string>GPT</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameGemini</string>
+			<key>relativePath</key>
+			<string>./Gemini.symbolset</string>
+			<key>swiftSymbol</key>
+			<string>gemini</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Volumes/Works/Antygravity-workspaces/Type.OH/Type.Oh/Type.Oh/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACImageNameTyphOHSymbol</string>
+			<key>relativePath</key>
+			<string>./TyphOH.symbol.symbolset</string>
+			<key>swiftSymbol</key>
+			<string>typhOHSymbol</string>
+		</dict>
+	</array>
+</dict>
+</plist>

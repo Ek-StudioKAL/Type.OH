@@ -36,6 +36,10 @@ final class ModelManager {
         loadedModelID = modelID
     }
 
+    func markUnloaded() {
+        loadedModelID = nil
+    }
+
     /// Resident memory of this process, in MB. Used to display approximate RAM usage in Settings.
     static var processResidentMB: Double {
         var info = mach_task_basic_info()

@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import AVFoundation
 import SwiftUI
 
 @MainActor
@@ -18,7 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var recordingPanel:  NSPanel?
     private var editorPanel:     NSPanel?
     private var onboardingPanel: NSPanel?
+    private var splashPanel:     NSPanel?
     private var scratchpadPanelController: ScratchpadPanelController?
+    private var recordingKeyMonitor: Any?
 
     // MARK: - App lifecycle
 
@@ -79,27 +82,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.applyHotkeys()
             }
         }
-        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.openSettings"), object: nil, queue: .main) { _ in
-            Task { @MainActor in
-                NSApp.setActivationPolicy(.regular)
-                NSApp.activate(ignoringOtherApps: true)
-                // showSettingsWindow: is the SwiftUI Settings scene's private action selector (macOS 13+)
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            }
-        }
-        NotificationCenter.default.addObserver(forName: SettingsTabRoute.notificationName, object: nil, queue: .main) { note in
-            let requestedTab = (note.object as? String).flatMap(SettingsTab.init(rawValue:))
-            Task { @MainActor in
-                if let requestedTab {
-                    SettingsTabRoute.setPendingTab(requestedTab)
-                }
-                NSApp.setActivationPolicy(.regular)
-                NSApp.activate(ignoringOtherApps: true)
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-                // The TabView itself observes the same notification; this side
-                // just makes sure the window is visible to react to it.
-            }
-        }
         NotificationCenter.default.addObserver(forName: .whisperModelDownloaded, object: nil, queue: .main) { [weak self] note in
             guard let self, let modelID = note.object as? String else { return }
             Task { @MainActor [weak self, modelID] in
@@ -110,31 +92,76 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Pre-load the last-used Whisper model only if it's already downloaded
-        if let folder = ModelManager.shared.modelFolderURL(for: settingsStore.whisperModel),
-           ModelManager.shared.isDownloaded(settingsStore.whisperModel) {
-            let name = settingsStore.whisperModel
-            Task { try? await whisperService.loadModel(name: name, at: folder) }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.whisper.reload"), object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let name = self.settingsStore.whisperModel
+                guard let folder = ModelManager.shared.modelFolderURL(for: name) else { return }
+                await self.whisperService.unload()
+                try? await self.whisperService.loadModel(name: name, at: folder)
+            }
+        }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.whisper.unload"), object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.whisperService.unload() }
         }
 
-        // Pre-warm the active provider's keychain entry off the main thread so
-        // the single annoying prompt (if any) happens once at launch — never
-        // again during a generation. Apple on-device skips the keychain
-        // entirely. Inactive providers stay un-prompted until the user
-        // explicitly Reveals or generates with them.
-        let active = settingsStore.activeProvider
-        DispatchQueue.global(qos: .userInitiated).async {
-            KeychainStore.prefetch(active)
+        // Dictation HUD actions — `Done` button + Return key commit; Esc cancels.
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.voice.commit"), object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.handleVoiceKey() }
+        }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.voice.cancel"), object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated { self.cancelVoiceRecording() }
         }
 
-        // First-launch onboarding handles permission prompts itself.
-        // For returning users with missing AX, fall back to the system trust prompt.
+        // First-launch onboarding handles permission prompts and warm-ups
+        // itself, so it's skipped on first launch. Returning users see the
+        // splash while the bootstrap pre-warms keychain + Whisper.
         if !settingsStore.hasCompletedOnboarding {
             showOnboarding()
-        } else if !AXIsProcessTrusted() {
-            let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
-            AXIsProcessTrustedWithOptions(opts)
+        } else {
+            if !AXIsProcessTrusted() {
+                let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
+                AXIsProcessTrustedWithOptions(opts)
+            }
+            showLaunchSplash()
         }
+    }
+
+    /// Show the launch splash and run the bootstrap. Splash hides itself when
+    /// bootstrap finishes (or after the 8 s soft budget — whichever is first).
+    private func showLaunchSplash() {
+        let bootstrap = LaunchBootstrap(settings: settingsStore, whisperService: whisperService)
+
+        let content = LaunchSplash(bootstrap: bootstrap) { [weak self] in
+            self?.hideLaunchSplash()
+        }
+
+        let hc = NSHostingController(rootView: content)
+        hc.sizingOptions = .preferredContentSize
+        let panel = makePanel(titled: false)
+        panel.contentViewController = hc
+
+        if let screen = NSScreen.main {
+            let size = hc.view.fittingSize
+            panel.setContentSize(size)
+            panel.setFrameOrigin(CGPoint(
+                x: screen.visibleFrame.midX - size.width / 2,
+                y: screen.visibleFrame.midY - size.height / 2
+            ))
+        }
+        bringPanelFront(panel)
+        splashPanel = panel
+
+        Task { await bootstrap.run() }
+    }
+
+    private func hideLaunchSplash() {
+        splashPanel?.close()
+        splashPanel = nil
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -153,6 +180,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await pasteService.paste(text)
             } catch {
                 showBannerError(error.localizedDescription)
+            }
+            // Respect the user's "keep model loaded" preference. If they
+            // disabled it, free the model now so RAM is returned between
+            // dictations (at the cost of warm-up on the next press).
+            if !settingsStore.whisperKeepLoaded {
+                await whisperService.unload()
             }
         } else {
             let modelName = settingsStore.whisperModel
@@ -177,7 +210,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showRecordingPanel() {
-        let hc = NSHostingController(rootView: RecordingOverlay())
+        let state = currentDictationHUDState()
+        let hc = NSHostingController(rootView: RecordingOverlay(state: state))
         hc.sizingOptions = .preferredContentSize
         let panel = makePanel(titled: false)
         panel.contentViewController = hc
@@ -192,11 +226,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         bringPanelFront(panel)
         recordingPanel = panel
+        installRecordingKeyMonitor()
     }
 
     private func hideRecordingPanel() {
         recordingPanel?.close()
         recordingPanel = nil
+        removeRecordingKeyMonitor()
+    }
+
+    /// Snapshot the model + permission state used by the dictation HUD when the
+    /// panel is shown. Re-computed each invocation (cheap; flag values).
+    private func currentDictationHUDState() -> DictationHUDState {
+        let selected = settingsStore.whisperModel
+        let manager = ModelManager.shared
+        let modelDisplay = manager.catalogue.first(where: { $0.id == selected })?.displayName ?? selected
+
+        let modelStatus: DictationHUDState.ModelStatus
+        if let loaded = manager.loadedModelID {
+            let loadedDisplay = manager.catalogue.first(where: { $0.id == loaded })?.displayName ?? loaded
+            modelStatus = .loaded(displayName: loadedDisplay)
+        } else if manager.isDownloaded(selected) {
+            modelStatus = .ready(displayName: modelDisplay)
+        } else {
+            modelStatus = .missing
+        }
+
+        // Mic auth: .authorized means we can record without prompting. The
+        // hotkey path implicitly requests on first use, so .notDetermined
+        // surfaces as "missing" here — that's intentional, the badge nudges
+        // the user toward System Settings.
+        let micAuth = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+
+        return DictationHUDState(
+            modelStatus: modelStatus,
+            axTrusted: AXIsProcessTrusted(),
+            micAuthorized: micAuth
+        )
+    }
+
+    /// Local key monitor that listens for Esc / Return while the HUD is on
+    /// screen. The panel is non-activating, so the standard responder chain
+    /// doesn't see these key presses — we install a process-local monitor and
+    /// translate them into the same notifications the Done button posts.
+    private func installRecordingKeyMonitor() {
+        removeRecordingKeyMonitor()
+        recordingKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            switch event.keyCode {
+            case 53: // Escape
+                NotificationCenter.default.post(name: NSNotification.Name("typeoh.voice.cancel"), object: nil)
+                return nil
+            case 36, 76: // Return / Enter (numpad)
+                NotificationCenter.default.post(name: NSNotification.Name("typeoh.voice.commit"), object: nil)
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+
+    private func removeRecordingKeyMonitor() {
+        if let monitor = recordingKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            recordingKeyMonitor = nil
+        }
+    }
+
+    /// Cancel-path counterpart to `handleVoiceKey`'s commit path. Stops the
+    /// recorder, drops the captured samples, tears down the panel, and honors
+    /// the keep-loaded preference.
+    private func cancelVoiceRecording() {
+        guard audioRecorder.isRecording else { return }
+        _ = audioRecorder.stop()
+        hideRecordingPanel()
+        if !settingsStore.whisperKeepLoaded {
+            Task { await whisperService.unload() }
+        }
     }
 
     // MARK: - Editor flow
@@ -249,7 +354,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hc = NSHostingController(rootView: content)
         hc.sizingOptions = .preferredContentSize
         let panel = makePanel(titled: true)
-        panel.title = sticky ? "ReTypeOH" : "AI Editor"
+        panel.title = "ReType • AI Editor"
         panel.contentViewController = hc
         panel.minSize = CGSize(width: 460, height: 220)
         panel.center()

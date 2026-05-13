@@ -1,30 +1,134 @@
+import AppKit
+import ApplicationServices
+import AVFoundation
 import Combine
 import SwiftUI
 
+/// State the HUD reads to label model + permission status. Computed once when
+/// the panel is shown; the timer ticks locally inside the view.
+struct DictationHUDState: Equatable {
+    enum ModelStatus: Equatable {
+        case loaded(displayName: String)
+        case ready(displayName: String)   // downloaded but not yet loaded into RAM
+        case missing
+    }
+
+    var modelStatus: ModelStatus
+    var axTrusted: Bool
+    var micAuthorized: Bool
+
+    var isReady: Bool {
+        if case .missing = modelStatus { return false }
+        return axTrusted && micAuthorized
+    }
+}
+
+/// Compact non-activating HUD shown during dictation. Replaces the old
+/// "red-dot + timer" pill with a richer surface:
+/// - Model-loaded indicator (matches Settings → Whisper status).
+/// - Permission badges (AX + mic) — visible only if a permission is missing.
+/// - Elapsed timer.
+/// - Done button (commits — transcribe + paste).
+/// - Esc cancels (discards audio).
+///
+/// The view is purely presentational; AppDelegate owns the recorder lifecycle.
+/// User actions post `typeoh.voice.commit` / `typeoh.voice.cancel` —
+/// AppDelegate routes those back into `handleVoiceKey` (commit) or
+/// `cancelVoiceRecording` (cancel).
 struct RecordingOverlay: View {
+    let state: DictationHUDState
+
     @State private var elapsed = 0
     @State private var pulsing = false
 
     private let clock = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(.red)
-                .frame(width: 10, height: 10)
-                .scaleEffect(pulsing ? 1.35 : 0.85)
-                .opacity(pulsing ? 1 : 0.5)
-                .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulsing)
+        HStack(spacing: 12) {
+            recordingIndicator
 
-            Text(timeString)
-                .font(.system(.body, design: .monospaced).weight(.medium))
-                .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(timeString)
+                    .font(.system(.title3, design: .rounded).monospacedDigit().weight(.semibold))
+                    .foregroundStyle(.white)
+
+                HStack(spacing: 6) {
+                    modelBadge
+                    if !state.axTrusted { permissionBadge(label: "AX", systemImage: "exclamationmark.shield") }
+                    if !state.micAuthorized { permissionBadge(label: "Mic", systemImage: "mic.slash") }
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            Button {
+                NotificationCenter.default.post(name: NSNotification.Name("typeoh.voice.commit"), object: nil)
+            } label: {
+                Text("Done")
+                    .font(.system(.callout, design: .rounded).weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Color.accentColor))
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .help("Stop and transcribe (Return)")
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(.black.opacity(0.82), in: Capsule())
+        .frame(minWidth: 260)
+        .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+        )
         .onAppear { pulsing = true }
         .onReceive(clock) { _ in elapsed += 1 }
+    }
+
+    private var recordingIndicator: some View {
+        Circle()
+            .fill(.red)
+            .frame(width: 10, height: 10)
+            .scaleEffect(pulsing ? 1.35 : 0.85)
+            .opacity(pulsing ? 1 : 0.5)
+            .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulsing)
+    }
+
+    @ViewBuilder
+    private var modelBadge: some View {
+        switch state.modelStatus {
+        case .loaded(let name):
+            badge(icon: "checkmark.circle.fill", tint: .green, text: name)
+        case .ready(let name):
+            badge(icon: "circle.fill", tint: .teal, text: name)
+        case .missing:
+            badge(icon: "exclamationmark.circle.fill", tint: .orange, text: "No model")
+        }
+    }
+
+    private func badge(icon: String, tint: Color, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(tint)
+            Text(text)
+                .font(.system(.caption2, design: .rounded))
+                .foregroundStyle(.white.opacity(0.8))
+        }
+    }
+
+    private func permissionBadge(label: String, systemImage: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: systemImage)
+                .font(.system(size: 9, weight: .semibold))
+            Text(label)
+                .font(.system(.caption2, design: .rounded).weight(.semibold))
+        }
+        .foregroundStyle(.orange)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1)
+        .background(Capsule().fill(Color.orange.opacity(0.18)))
     }
 
     private var timeString: String {
@@ -33,6 +137,10 @@ struct RecordingOverlay: View {
 }
 
 #Preview {
-    RecordingOverlay()
-        .padding()
+    RecordingOverlay(state: DictationHUDState(
+        modelStatus: .loaded(displayName: "base"),
+        axTrusted: true,
+        micAuthorized: true
+    ))
+    .padding()
 }

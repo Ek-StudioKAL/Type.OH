@@ -14,7 +14,7 @@ final class AboutPanelController {
         let content = AboutPanelContent(
             onOpenSettings: { [weak self] in
                 self?.close()
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                NotificationCenter.default.post(name: NSNotification.Name("typeoh.openSettings"), object: nil)
             },
             onClose: { [weak self] in
                 self?.close()

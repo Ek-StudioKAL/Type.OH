@@ -23,7 +23,6 @@ struct AIEditorPanel: View {
     @State private var sourceLanguage: Locale.Language? = nil
     @State private var targetLanguage  = Locale.Language(identifier: "en")
     @State private var hasLoadedTranslationSettings = false
-    @State private var isShowingTranslationPopover = false
 
     init(originalText: String, isSticky: Bool = false, onApply: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
         self.originalText = originalText
@@ -41,6 +40,10 @@ struct AIEditorPanel: View {
                 StyleChipRow(selected: $selectedStyle)
             }
 
+            if mode == .translate {
+                translateRow
+            }
+
             inputCard
 
             if !result.isEmpty {
@@ -52,8 +55,6 @@ struct AIEditorPanel: View {
             }
 
             actionBar
-
-            statusBar
         }
         .padding(14)
         .frame(minWidth: 480, idealWidth: 560, maxWidth: 900)
@@ -73,18 +74,10 @@ struct AIEditorPanel: View {
             }
             toolbarButton(title: "Translate", systemImage: "translate", isActive: mode == .translate) {
                 setMode(.translate)
-                isShowingTranslationPopover = true
-            }
-            .popover(isPresented: $isShowingTranslationPopover, arrowEdge: .bottom) {
-                translationPopover
             }
             .contextMenu {
                 Text(currentLanguagePairLabel)
                 Divider()
-                Button("Configure languages…") {
-                    setMode(.translate)
-                    isShowingTranslationPopover = true
-                }
                 if sourceLanguage != nil {
                     Button("Swap source ⇄ target") {
                         if let src = sourceLanguage {
@@ -97,6 +90,9 @@ struct AIEditorPanel: View {
                         sourceLanguage = nil
                         persistTranslationSettings()
                     }
+                }
+                Button("Open Translation Settings…") {
+                    openSettingsAt(.translation)
                 }
             }
 
@@ -122,40 +118,34 @@ struct AIEditorPanel: View {
         .padding(.horizontal, 2)
     }
 
-    private var translationPopover: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                Image(systemName: "translate")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
-                Text("Translate")
-                    .font(.headline)
-                Spacer()
-            }
-
+    /// Inline language selectors shown under the toolbar when mode is `.translate`.
+    /// Mirrors the Style chip row so the two modes feel like one design.
+    /// Edits write through to `settings.sourceLanguage` / `targetLanguage`
+    /// (also the "defaults" used everywhere else).
+    private var translateRow: some View {
+        HStack(spacing: 10) {
             LanguagePicker(
                 sourceLanguage: $sourceLanguage,
                 targetLanguage: $targetLanguage,
-                compact: false,
+                compact: true,
                 availability: settings.translationProvider == .nativeOS ? .nativeOSOffline : .allLocaleLanguages
             )
             .onChange(of: sourceLanguage) { persistTranslationSettings() }
             .onChange(of: targetLanguage) { persistTranslationSettings() }
 
-            HStack {
-                Button("Cancel") { isShowingTranslationPopover = false }
-                    .buttonStyle(.bordered)
-                    .keyboardShortcut(.escape)
+            Spacer(minLength: 8)
 
-                Spacer()
-
-                Button("Done") { isShowingTranslationPopover = false }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.return)
+            Button {
+                openSettingsAt(.translation)
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
+            .help("Open Translation Settings")
         }
-        .padding(16)
-        .frame(width: 360)
+        .padding(.horizontal, 2)
     }
 
     // MARK: - Cards
@@ -287,40 +277,12 @@ struct AIEditorPanel: View {
                 .disabled(isProcessing || editableInput.isEmpty)
 
             if !result.isEmpty {
-                Button("Apply") { onApply(result) }
+                Button("Insert") { onApply(result) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.return)
+                    .help("Replace the original selection with the result")
             }
         }
-    }
-
-    // MARK: - Status bar
-
-    private var statusBar: some View {
-        HStack {
-            HStack(spacing: 6) {
-                Text("\(editableInput.count) characters")
-                Text("•")
-                Text(modeStatusLabel)
-            }
-
-            Spacer()
-
-            HStack(spacing: 6) {
-                Text("Provider: \(settings.activeProvider.displayName)")
-                if mode == .translate {
-                    Text("•")
-                    Text(currentLanguagePairLabel)
-                }
-            }
-
-            Spacer()
-
-            Text(statusMessage)
-                .foregroundStyle(statusIsError ? .red : .secondary)
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
     }
 
     // MARK: - Toolbar primitives (mirrors LazyPad)
@@ -328,21 +290,7 @@ struct AIEditorPanel: View {
     @ViewBuilder
     private func toolbarButton(title: String, systemImage: String, isActive: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 17, weight: .regular))
-                    .frame(width: 28, height: 22)
-                Text(title)
-                    .font(.caption2)
-                    .lineLimit(1)
-            }
-            .frame(width: 62)
-            .foregroundStyle(isActive ? Color.accentColor : .primary)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(isActive ? Color.accentColor.opacity(0.15) : Color.clear)
-            )
-            .contentShape(Rectangle())
+            AccentToolbarLabel(title: title, systemImage: systemImage, isActive: isActive)
         }
         .buttonStyle(.plain)
     }
@@ -352,7 +300,7 @@ struct AIEditorPanel: View {
     private var actionLabel: String {
         switch mode {
         case .translate: "Translate"
-        case .style:     "Apply Style"
+        case .style:     "Stylize"
         case .fix:       "Fix"
         }
     }
@@ -472,6 +420,101 @@ struct AIEditorPanel: View {
             name: SettingsTabRoute.notificationName,
             object: tab.rawValue
         )
+    }
+}
+
+/// A sidebar row with full-width hit area, hover tint, and selection state.
+/// Used in LazyPad for style presets, custom presets, and provider switching.
+struct SidebarHoverRow<Content: View>: View {
+    var isSelected: Bool = false
+    let action: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    @State private var isHovering = false
+
+    private var fillColor: Color {
+        if isSelected { return Color.accentColor.opacity(0.18) }
+        if isHovering { return Color.accentColor.opacity(0.08) }
+        return Color.clear
+    }
+
+    private var foreground: Color {
+        if isSelected { return Color.accentColor }
+        if isHovering { return Color.accentColor }
+        return Color.primary
+    }
+
+    var body: some View {
+        Button(action: action) {
+            content()
+                .foregroundStyle(foreground)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(fillColor)
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.14), value: isHovering)
+        .animation(.easeOut(duration: 0.14), value: isSelected)
+    }
+}
+
+/// A toolbar label used by both ReType (AI Editor) and LazyPad.
+///
+/// Visual language:
+/// - Symbol tinted with the accent color when `isActive` or hovered
+///   (no filled background "highlight" rectangle).
+/// - Thin 0.5 pt accent underline appears under the active tab.
+/// - Subtle scale / opacity transition on hover to feel alive.
+struct AccentToolbarLabel: View {
+    let title: String
+    let systemImage: String
+    var isActive: Bool = false
+    var literalGlyph: String? = nil
+
+    @State private var isHovering = false
+
+    private var tinted: Bool { isActive || isHovering }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Group {
+                if let literalGlyph {
+                    Text(literalGlyph)
+                        .font(.system(size: 17, weight: tinted ? .semibold : .regular))
+                } else {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 17, weight: tinted ? .semibold : .regular))
+                        .symbolRenderingMode(.hierarchical)
+                }
+            }
+            .foregroundStyle(tinted ? Color.accentColor : .primary)
+            .frame(width: 28, height: 22)
+            .scaleEffect(isHovering && !isActive ? 1.06 : 1.0)
+
+            Text(title)
+                .font(.caption2)
+                .lineLimit(1)
+                .foregroundStyle(tinted ? Color.accentColor : .primary)
+
+            // Thin accent underline beneath the active tab — replaces the
+            // filled "highlighted area" used before.
+            Rectangle()
+                .fill(Color.accentColor)
+                .frame(height: 0.5)
+                .frame(maxWidth: isActive ? 38 : 0)
+                .opacity(isActive ? 1.0 : 0.0)
+        }
+        .frame(width: 62)
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.14), value: isHovering)
+        .animation(.easeOut(duration: 0.14), value: isActive)
     }
 }
 

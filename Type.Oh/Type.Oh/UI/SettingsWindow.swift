@@ -297,6 +297,8 @@ private struct ModelsTab: View {
     @State private var manager = ModelManager.shared
     @State private var ramMB: Double = ModelManager.processResidentMB
     @State private var ramTimer: Timer?
+    @State private var showReloadPrompt = false
+    @State private var pendingSwitchModel: String?
 
     var body: some View {
         @Bindable var settings = settings
@@ -307,7 +309,16 @@ private struct ModelsTab: View {
                         Text("\(m.displayName)  \(m.sizeDescription)").tag(m.id)
                     }
                 }
-                .onChange(of: settings.whisperModel) { settings.save() }
+                .onChange(of: settings.whisperModel) { _, newModel in
+                    settings.save()
+                    // If a different model is currently loaded, ask before
+                    // unloading + reloading. Whisper reloads cost 1-5 s.
+                    if let loaded = manager.loadedModelID, loaded != newModel,
+                       manager.isDownloaded(newModel) {
+                        pendingSwitchModel = newModel
+                        showReloadPrompt = true
+                    }
+                }
 
                 LabeledContent("Status") {
                     HStack(spacing: 6) {
@@ -331,6 +342,33 @@ private struct ModelsTab: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Section("Loading") {
+                Toggle("Keep model loaded in memory", isOn: Binding(
+                    get: { settings.whisperKeepLoaded },
+                    set: { value in
+                        settings.whisperKeepLoaded = value
+                        settings.save()
+                        if !value {
+                            // Free the model now so the toggle has immediate effect.
+                            NotificationCenter.default.post(name: NSNotification.Name("typeoh.whisper.unload"), object: nil)
+                        } else if manager.loadedModelID == nil,
+                                  manager.isDownloaded(settings.whisperModel) {
+                            // User re-enabled and nothing is loaded — warm up.
+                            NotificationCenter.default.post(name: NSNotification.Name("typeoh.whisper.reload"), object: nil)
+                        }
+                    }
+                ))
+                .help("Off: model is dropped from RAM between dictations. Saves memory but next dictation pays a 1-5 s warm-up.")
+
+                Button {
+                    NotificationCenter.default.post(name: NSNotification.Name("typeoh.whisper.reload"), object: nil)
+                } label: {
+                    Label("Reload Selected Model", systemImage: "arrow.clockwise")
+                }
+                .buttonStyle(.bordered)
+                .disabled(!manager.isDownloaded(settings.whisperModel))
+            }
             if let err = manager.lastError {
                 Section {
                     Text(err).font(.caption).foregroundStyle(.red)
@@ -346,6 +384,20 @@ private struct ModelsTab: View {
         .padding()
         .onAppear { startRAMPolling() }
         .onDisappear { stopRAMPolling() }
+        .alert("Reload Whisper model?",
+               isPresented: $showReloadPrompt,
+               presenting: pendingSwitchModel) { _ in
+            Button("Reload Selected Model") {
+                NotificationCenter.default.post(name: NSNotification.Name("typeoh.whisper.reload"), object: nil)
+                pendingSwitchModel = nil
+            }
+            Button("Later", role: .cancel) {
+                pendingSwitchModel = nil
+            }
+        } message: { model in
+            let info = manager.catalogue.first(where: { $0.id == model })
+            Text("Restart Whisper to switch to \(info?.displayName ?? model). The currently loaded model will be unloaded and the new one loaded — this takes 1-5 s.")
+        }
     }
 
     private func startRAMPolling() {
@@ -531,6 +583,10 @@ private struct PresetsTab: View {
 private struct TranslationTab: View {
     @Environment(SettingsStore.self) private var settings
 
+    @State private var sourceLanguage: Locale.Language? = nil
+    @State private var targetLanguage: Locale.Language  = Locale.Language(identifier: "en")
+    @State private var hasLoadedFromSettings = false
+
     var body: some View {
         @Bindable var settings = settings
         Form {
@@ -554,22 +610,16 @@ private struct TranslationTab: View {
             }
 
             Section("Default Languages") {
-                LabeledContent("Source") {
-                    Text(settings.sourceLanguage.map(localizedName) ?? "Auto-detect")
-                        .foregroundStyle(.secondary)
-                }
-                LabeledContent("Target") {
-                    Text(localizedName(settings.targetLanguage))
-                        .foregroundStyle(.secondary)
-                }
-                Text("Pick defaults the next time you open a translate panel — they persist automatically.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                LanguagePicker(
+                    sourceLanguage: $sourceLanguage,
+                    targetLanguage: $targetLanguage,
+                    compact: false,
+                    availability: settings.translationProvider == .nativeOS ? .nativeOSOffline : .allLocaleLanguages
+                )
+                .onChange(of: sourceLanguage) { persist() }
+                .onChange(of: targetLanguage) { persist() }
 
-            Section {
-                Text("All translation actions across LazyPad and ReType use this engine and these languages. If the engine isn't configured the next time you translate, this Settings tab opens automatically.")
+                Text("ReType and LazyPad use these defaults — translate buttons run instantly without re-asking.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -577,9 +627,19 @@ private struct TranslationTab: View {
         }
         .formStyle(.grouped)
         .padding()
+        .onAppear { loadFromSettingsIfNeeded() }
     }
 
-    private func localizedName(_ id: String) -> String {
-        Locale.current.localizedString(forIdentifier: id) ?? id
+    private func loadFromSettingsIfNeeded() {
+        guard !hasLoadedFromSettings else { return }
+        sourceLanguage = settings.sourceLanguage.map(Locale.Language.init(identifier:))
+        targetLanguage = Locale.Language(identifier: settings.targetLanguage)
+        hasLoadedFromSettings = true
+    }
+
+    private func persist() {
+        settings.sourceLanguage = sourceLanguage?.minimalIdentifier
+        settings.targetLanguage = targetLanguage.minimalIdentifier
+        settings.save()
     }
 }
