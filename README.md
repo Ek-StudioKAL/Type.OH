@@ -1,118 +1,96 @@
-# iType.OH
+# Type.OH
 
-A native macOS menu-bar app that does two things, both with a single hotkey:
+Type.OH is a native macOS writing and dictation utility for moving quickly between dictation, selected-text rewrites, translation, and longer-form editing.
 
-1. **Voice → Text** — press a hotkey, speak, the transcribed text is pasted where your cursor was. Runs **locally** with OpenAI Whisper via [WhisperKit](https://github.com/argmaxinc/WhisperKit) on the Apple Neural Engine. No audio leaves your machine.
-2. **AI Editor** — highlight text in any app, press a second hotkey, a floating panel opens. **Translate**, **Style** (Formal, Concise, Friendly, Corporate, Pirate 🏴‍☠️), or **Fix** (typos, grammar). Hit Apply — the selected text is replaced in place.
+## Workflows
 
-Everything runs **locally and free** by default:
+- `LazyPad`: a persistent writing window with native AppKit text editing, provider switching, custom style presets, translation, and autosave.
+- `ReType`: a selected-text popup for fixing, restyling, and translating text from other apps.
+- `Dictate`: hold-to-record speech transcription with local Whisper models.
 
-- **Voice** → OpenAI Whisper via WhisperKit on the Neural Engine.
-- **Translate** → Apple's on-device Translation framework.
-- **Style / Fix** → Apple Intelligence's on-device language model via the **Foundation Models framework** (macOS 26 Tahoe).
+## Screenshots
 
-Optionally, bring your own API key for **Anthropic Claude**, **OpenAI**, or **Google Gemini** if you want a heavier cloud model for Style / Fix. Keys are stored in the macOS Keychain. No telemetry. No third parties beyond the provider you choose.
+![Menu bar menu](screenshots/menubar_menu.png)
 
-> The app has no Dock icon — it lives in the **menu bar** (top-right of your screen).
+![ReType popup window](screenshots/ReTypo_popup_window.png)
 
----
+![ReType translation window](screenshots/ReTypo_popup_window_translation.png)
 
-## Install
+![LazyPad window](screenshots/SketchPad-LazyPad-window.png)
 
-1. Download the latest `.dmg` from the [Releases](#) page.
-2. Drag **Type.OH** to **Applications**.
-3. Launch from Applications or Spotlight.
+## Requirements
 
-### "Type.OH is damaged and can't be opened"
+- macOS with Xcode installed.
+- Accessibility permission for cross-app text capture and paste workflows.
+- Microphone permission for dictation.
+- A downloaded Whisper model for local speech transcription.
+- Optional API keys in macOS Keychain for Anthropic, OpenAI, or Gemini.
+- Apple Intelligence availability if using the Apple on-device LLM provider.
 
-Standard macOS warning for apps not signed with a paid Apple Developer certificate. One-time fix in Terminal:
+## Setup
 
-```sh
-xattr -cr "/Applications/Type.OH.app"
+1. Open `Type.Oh/Type.Oh.xcodeproj` in Xcode.
+2. Select the main app scheme.
+3. Build and run the app.
+4. Complete the setup wizard.
+5. Grant Accessibility and Microphone access when prompted.
+6. Download a Whisper model from `Settings -> Whisper`.
+7. Add cloud provider keys in `Settings -> Providers` if you want to use Anthropic, OpenAI, or Gemini.
+
+## Hotkeys
+
+The defaults are:
+
+- `F13`: voice dictation.
+- `F14`: ReType selected-text editor.
+- `F15`: LazyPad.
+
+You can change or reset these in `Settings -> General`.
+
+## Translation
+
+Type.OH supports three translation engines:
+
+- Native macOS Translation: offline and fast, with limited languages.
+- Apple On-Device LLM: private local model when Apple Intelligence is available.
+- Cloud Provider: uses the currently selected Anthropic, OpenAI, or Gemini provider.
+
+## Running Outside Xcode
+
+You can also build the app from this repository and run the built `.app` directly.
+
+```bash
+xcodebuild -project Type.Oh/Type.Oh.xcodeproj -scheme Type.Oh -configuration Release build
 ```
 
-### First launch
+The built app appears under Xcode DerivedData, for example:
 
-The Settings window opens automatically.
-
-1. **Pick a Whisper model** and click Download (start with `base` — ~142 MB, fast).
-2. **Style / Fix** works out-of-the-box on Apple Silicon Macs with Apple Intelligence enabled — no API key needed. Optionally add an Anthropic / OpenAI / Google key in **Settings → Provider** to use a cloud model instead.
-3. macOS will ask for **Microphone** access the first time you record — allow it.
-4. Open **System Settings → Privacy & Security → Accessibility** and enable **Type.OH**. This is required so the app can read your selected text and paste results back into other apps.
-
----
-
-## Default Hotkeys
-
-| Action | Hotkey |
-|---|---|
-| Start / stop voice recording | `⌃ F13` |
-| Open AI Editor on selected text | `⌥ F13` |
-
-Both are configurable in Settings.
-
-## Whisper Models
-
-| Model | Size | Speed | RAM & Hardware Notes |
-|---|---|---|---|
-| tiny | ~75 MB | Fastest | ~200MB RAM. Recommended for MacBook Air 8GB RAM. |
-| base | ~142 MB | Fast | ~400MB RAM. Default; snappy on any Apple Silicon Mac. |
-| small | ~466 MB | Moderate | ~1GB RAM. Good balance of speed and accuracy. |
-| medium | ~1.5 GB | Slow | ~2.5GB RAM. 16GB RAM recommended. |
-| large-v3 | ~3 GB | Slowest | ~5GB RAM. Most accurate; 16GB+ RAM. M Pro/Max/Ultra recommended for decent speeds. |
-
-Models are downloaded from Hugging Face and stored in `~/Library/Application Support/Type.OH/models/`.
-
-## Permissions
-
-- **Microphone** — voice recording
-- **Accessibility** — read selected text + paste results into other apps
-
----
-
-## Building from Source
-
-<details>
-<summary>For developers who want to build the app themselves</summary>
-
-### Prerequisites
-
-- **macOS 26 Tahoe or later** (required for the Foundation Models framework — the on-device LLM that powers Style / Fix)
-- **Apple Silicon** (M1 or later) with **Apple Intelligence enabled**
-- **Xcode 17** or later
-
-### Build
-
-```sh
-git clone https://github.com/<you>/Type.OH.git
-cd Type.OH
-open Type.OH.xcodeproj
+```text
+~/Library/Developer/Xcode/DerivedData/.../Build/Products/Release/Type.Oh.app
 ```
 
-In Xcode: select the `Type.OH` scheme → ⌘R to run.
+Launch it with:
 
-### Tech Stack
-
-- **Swift 6 + SwiftUI**
-- **WhisperKit** — local Whisper inference via Core ML on the Neural Engine
-- **Apple Foundation Models** (`FoundationModels`) — on-device LLM for Style / Fix
-- **Apple Translation framework** — local, on-device translation
-- **Pluggable cloud providers** (optional, BYOK in Keychain) — Anthropic, OpenAI, Google behind a `TextAIProvider` protocol
-- **AVAudioEngine** — mic capture
-- **Carbon `RegisterEventHotKey`** — global hotkeys
-- **AX API + `CGEvent`** — read selection / simulate paste
-
-### Project Structure
-
-```
-Type.OH/
-├── Core/         # Settings, hotkeys, focus capture, paste
-├── Voice/        # AudioRecorder, WhisperService, ModelManager
-├── Editor/       # SelectionReader, TranslationService, TextAI providers, StylePresets
-├── UI/           # MenuBar, RecordingOverlay, AIEditorPanel, SettingsWindow
-└── Resources/
+```bash
+open /path/to/Type.Oh.app
 ```
 
-See [CONTEXT.md](CONTEXT.md) for the full engineering brief, architecture, and the original Action Extension PRD that this project pivoted from.
+If macOS blocks first launch, right-click `Type.Oh.app` in Finder and choose `Open`, or allow it from System Settings after the first launch attempt.
 
-</details>
+If the app was downloaded, copied, or archived and macOS added quarantine attributes, you may need:
+
+```bash
+xattr -dr com.apple.quarantine /path/to/Type.Oh.app
+```
+
+## Important Note
+
+This repository does not currently produce a signed or notarized app. macOS may warn that the app is from an unidentified developer, and some users may need to launch it with `Right-click -> Open`.
+
+## Development Notes
+
+- Cloud provider keys are stored in the user Keychain, not in this repository.
+- LazyPad autosaves its text in Application Support.
+- Provider-specific sidebar icons live in the asset catalog.
+- The app defaults to showing in the Dock.
+- The first setup completion opens LazyPad automatically.
