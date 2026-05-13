@@ -9,8 +9,7 @@ struct TypeOhApp: App {
             MenuBarContent()
                 .environment(appDelegate.settingsStore)
         } label: {
-            Image(nsImage: menuBarIcon)
-                .help("Type.OH")
+            MenuBarIconLabel(image: menuBarIcon)
         }
 
         Settings {
@@ -28,5 +27,31 @@ struct TypeOhApp: App {
         }
         sized.unlockFocus()
         return sized
+    }
+}
+
+private struct MenuBarIconLabel: View {
+    @Environment(\.openSettings) private var openSettings
+
+    let image: NSImage
+
+    var body: some View {
+        Image(nsImage: image)
+            .help("Type.OH")
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("typeoh.openSettings"))) { _ in
+                openSettingsWindow()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: SettingsTabRoute.notificationName)) { note in
+                if let requestedTab = (note.object as? String).flatMap(SettingsTab.init(rawValue:)) {
+                    SettingsTabRoute.setPendingTab(requestedTab)
+                }
+                openSettingsWindow()
+            }
+    }
+
+    private func openSettingsWindow() {
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
     }
 }
