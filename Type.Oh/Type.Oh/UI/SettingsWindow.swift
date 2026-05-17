@@ -1,8 +1,28 @@
 import SwiftUI
 import ServiceManagement
 
-enum SettingsTab: String, Codable, Sendable {
+enum SettingsTab: String, Codable, CaseIterable, Sendable {
     case general, providers, presets, translation, models
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .providers: "Providers"
+        case .presets: "Presets"
+        case .translation: "Translation"
+        case .models: "Whisper"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .general: "gear"
+        case .providers: "brain.filled.head.profile"
+        case .presets: "paintbrush"
+        case .translation: "translate"
+        case .models: "waveform"
+        }
+    }
 }
 
 enum SettingsTabRoute {
@@ -34,24 +54,14 @@ struct SettingsWindow: View {
     @State private var selectedTab: SettingsTab = .general
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            GeneralTab()
-                .tabItem { Label("General", systemImage: "gear") }
-                .tag(SettingsTab.general)
-            ProvidersTab()
-                .tabItem { Label("Providers", systemImage: "brain.filled.head.profile") }
-                .tag(SettingsTab.providers)
-            PresetsTab()
-                .tabItem { Label("Presets", systemImage: "paintbrush") }
-                .tag(SettingsTab.presets)
-            TranslationTab()
-                .tabItem { Label("Translation", systemImage: "translate") }
-                .tag(SettingsTab.translation)
-            ModelsTab()
-                .tabItem { Label("Whisper", systemImage: "waveform") }
-                .tag(SettingsTab.models)
+        VStack(spacing: 0) {
+            SettingsTabBar(selectedTab: $selectedTab)
+                .padding(.top, 18)
+                .padding(.bottom, 8)
+
+            selectedTabContent
         }
-        .frame(width: 600, height: 640)
+        .frame(width: 620, height: 680)
         .onAppear {
             if let pendingTab = SettingsTabRoute.consumePendingTab() {
                 selectedTab = pendingTab
@@ -62,6 +72,44 @@ struct SettingsWindow: View {
                let tab = SettingsTab(rawValue: raw) {
                 SettingsTabRoute.clearPendingTab()
                 selectedTab = tab
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var selectedTabContent: some View {
+        switch selectedTab {
+        case .general:
+            GeneralTab()
+        case .providers:
+            ProvidersTab()
+        case .presets:
+            PresetsTab()
+        case .translation:
+            TranslationTab()
+        case .models:
+            ModelsTab()
+        }
+    }
+}
+
+private struct SettingsTabBar: View {
+    @Binding var selectedTab: SettingsTab
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            ForEach(SettingsTab.allCases, id: \.self) { tab in
+                Button {
+                    selectedTab = tab
+                } label: {
+                    AccentToolbarLabel(
+                        title: tab.title,
+                        systemImage: tab.systemImage,
+                        isActive: selectedTab == tab
+                    )
+                }
+                .buttonStyle(.plain)
+                .help(tab.title)
             }
         }
     }
@@ -292,6 +340,7 @@ private struct ProvidersTab: View {
 
 // MARK: - Models
 
+
 private struct ModelsTab: View {
     @Environment(SettingsStore.self) private var settings
     @State private var manager = ModelManager.shared
@@ -300,10 +349,22 @@ private struct ModelsTab: View {
     @State private var showReloadPrompt = false
     @State private var pendingSwitchModel: String?
 
+    private var languageOptions: [Locale.Language] {
+        var seen = Set<String>()
+        return Locale.availableIdentifiers
+            .compactMap { identifier -> Locale.Language? in
+                let language = Locale.Language(identifier: identifier)
+                let minimal = language.minimalIdentifier
+                guard !minimal.isEmpty, seen.insert(minimal).inserted else { return nil }
+                return Locale.Language(identifier: minimal)
+            }
+            .sorted { displayName($0).localizedCaseInsensitiveCompare(displayName($1)) == .orderedAscending }
+    }
+
     var body: some View {
         @Bindable var settings = settings
         Form {
-            Section {
+            Section("Whisper Model Configuration") {
                 Picker("Active model", selection: $settings.whisperModel) {
                     ForEach(manager.catalogue) { m in
                         Text("\(m.displayName)  \(m.sizeDescription)").tag(m.id)
@@ -320,30 +381,57 @@ private struct ModelsTab: View {
                     }
                 }
 
-                LabeledContent("Status") {
-                    HStack(spacing: 6) {
-                        if let loaded = manager.loadedModelID,
-                           let info   = manager.catalogue.first(where: { $0.id == loaded }) {
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                            Text("Loaded: \(info.displayName)")
-                        } else if manager.isDownloaded(settings.whisperModel) {
-                            Image(systemName: "circle.fill").foregroundStyle(.teal)
-                            Text("Ready — loads on first use").foregroundStyle(.secondary)
-                        } else {
-                            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
-                            Text("No model downloaded").foregroundStyle(.secondary)
-                        }
+                HStack(alignment: .center, spacing: 14) {
+                    LabeledContent("Status") {
+                        modelStatusLabel
+                    }
+                    Divider()
+                    LabeledContent("Memory") {
+                        Text(String(format: "%.0f MB", ramMB))
+                            .font(.body.monospacedDigit())
+                            .foregroundStyle(.secondary)
                     }
                 }
 
-                LabeledContent("Memory in use") {
-                    Text(String(format: "%.0f MB", ramMB))
-                        .font(.body.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                HStack(alignment: .center, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Input language")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        LangPickerButton(
+                            title: settings.whisperInputLanguage.map { displayName(Locale.Language(identifier: $0)) } ?? "Auto-detect",
+                            isAuto: settings.whisperInputLanguage == nil,
+                            supported: languageOptions,
+                            includeAuto: true
+                        ) { language in
+                            settings.whisperInputLanguage = language?.minimalIdentifier
+                            settings.save()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Output language")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        LangPickerButton(
+                            title: settings.whisperOutputLanguage.map { displayName(Locale.Language(identifier: $0)) } ?? "Spoken language",
+                            isAuto: settings.whisperOutputLanguage == nil,
+                            supported: languageOptions,
+                            includeAuto: true,
+                            autoTitle: "Spoken language"
+                        ) { language in
+                            settings.whisperOutputLanguage = language?.minimalIdentifier
+                            settings.save()
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
-            Section("Loading") {
+            Section {
                 Toggle("Keep model loaded in memory", isOn: Binding(
                     get: { settings.whisperKeepLoaded },
                     set: { value in
@@ -360,6 +448,10 @@ private struct ModelsTab: View {
                     }
                 ))
                 .help("Off: model is dropped from RAM between dictations. Saves memory but next dictation pays a 1-5 s warm-up.")
+
+                Text("Keeping the model loaded uses more memory while idle, but avoids the next dictation waiting for Whisper to warm up.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Button {
                     NotificationCenter.default.post(name: NSNotification.Name("typeoh.whisper.reload"), object: nil)
@@ -407,9 +499,50 @@ private struct ModelsTab: View {
         }
     }
 
+    private var whisperInputLanguageBinding: Binding<Locale.Language?> {
+        Binding(
+            get: { settings.whisperInputLanguage.map(Locale.Language.init(identifier:)) },
+            set: { value in
+                settings.whisperInputLanguage = value?.minimalIdentifier
+                settings.save()
+            }
+        )
+    }
+
+    private var whisperOutputLanguageBinding: Binding<Locale.Language> {
+        Binding(
+            get: { Locale.Language(identifier: settings.whisperOutputLanguage ?? settings.whisperInputLanguage ?? "en") },
+            set: { value in
+                settings.whisperOutputLanguage = value.minimalIdentifier
+                settings.save()
+            }
+        )
+    }
+
     private func stopRAMPolling() {
         ramTimer?.invalidate()
         ramTimer = nil
+    }
+
+    @ViewBuilder
+    private var modelStatusLabel: some View {
+        HStack(spacing: 6) {
+            if let loaded = manager.loadedModelID,
+               let info = manager.catalogue.first(where: { $0.id == loaded }) {
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Text("Loaded: \(info.displayName)")
+            } else if manager.isDownloaded(settings.whisperModel) {
+                Image(systemName: "circle.fill").foregroundStyle(.teal)
+                Text("Ready").foregroundStyle(.secondary)
+            } else {
+                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                Text("No model").foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func displayName(_ language: Locale.Language) -> String {
+        Locale.current.localizedString(forIdentifier: language.minimalIdentifier) ?? language.minimalIdentifier
     }
 
     @ViewBuilder

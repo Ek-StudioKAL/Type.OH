@@ -31,9 +31,17 @@ actor WhisperService {
         await ModelManager.shared.markUnloaded()
     }
 
-    func transcribe(audio: [Float]) async throws -> String {
+    func transcribe(audio: [Float], inputLanguage: String?) async throws -> String {
         guard let kit = whisperKit else { throw WhisperError.modelNotLoaded }
-        let results = try await kit.transcribe(audioArray: audio)
+        let trimmedLanguage = inputLanguage?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let language = trimmedLanguage?.isEmpty == true ? nil : trimmedLanguage
+        let options = DecodingOptions(
+            task: .transcribe,
+            language: language,
+            detectLanguage: language == nil,
+            withoutTimestamps: true
+        )
+        let results = try await kit.transcribe(audioArray: audio, decodeOptions: options)
         return results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespaces)
     }
 

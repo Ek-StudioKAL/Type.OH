@@ -73,6 +73,8 @@ enum TranslationProviderID: String, Codable, CaseIterable, Sendable {
 @MainActor
 final class SettingsStore {
     var whisperModel:    String        = "openai_whisper-base"
+    var whisperInputLanguage: String?  = nil     // nil = auto-detect
+    var whisperOutputLanguage: String? = nil     // nil = keep spoken language
     var voiceHotkey:     HotkeyConfig  = .defaultVoice
     var editorHotkey:    HotkeyConfig  = .defaultEditor
     var scratchpadHotkey: HotkeyConfig? = .defaultScratchpad
@@ -124,6 +126,8 @@ final class SettingsStore {
 private extension SettingsStore {
     struct Snapshot: Codable {
         var whisperModel, targetLanguage: String
+        var whisperInputLanguage: String?
+        var whisperOutputLanguage: String?
         var sourceLanguage: String?
         var voiceHotkey, editorHotkey: HotkeyConfig
         var scratchpadHotkey: HotkeyConfig?
@@ -141,6 +145,8 @@ private extension SettingsStore {
 
         init(_ s: SettingsStore) {
             whisperModel   = s.whisperModel
+            whisperInputLanguage = s.whisperInputLanguage
+            whisperOutputLanguage = s.whisperOutputLanguage
             voiceHotkey    = s.voiceHotkey
             editorHotkey   = s.editorHotkey
             scratchpadHotkey = s.scratchpadHotkey
@@ -162,6 +168,8 @@ private extension SettingsStore {
 
         func apply(to s: SettingsStore) {
             s.whisperModel   = whisperModel
+            s.whisperInputLanguage = whisperInputLanguage
+            s.whisperOutputLanguage = whisperOutputLanguage
             s.voiceHotkey    = voiceHotkey
             s.editorHotkey   = editorHotkey
             s.scratchpadHotkey = scratchpadHotkey

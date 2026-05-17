@@ -22,6 +22,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var splashPanel:     NSPanel?
     private var scratchpadPanelController: ScratchpadPanelController?
     private var recordingKeyMonitor: Any?
+    private var recordingDestination: RecordingDestination = .focusedApp
+
+    private enum RecordingDestination {
+        case focusedApp
+        case scratchpad
+    }
 
     // MARK: - App lifecycle
 
@@ -34,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         HotkeyManager.shared.onVoiceHotkey = { [weak self] in
             guard let self else { return }
-            Task { await self.handleVoiceKey() }
+            Task { await self.handleVoiceKey(destination: .focusedApp) }
         }
         HotkeyManager.shared.onEditorHotkey = { [weak self] in
             guard let self else { return }
@@ -56,7 +62,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.voiceHotkey"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            Task { await self.handleVoiceKey() }
+            Task { await self.handleVoiceKey(destination: .focusedApp) }
+        }
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.scratchpad.dictation"), object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.handleVoiceKey(destination: .scratchpad) }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.editorHotkey.sticky"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
@@ -110,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Dictation HUD actions — `Done` button + Return key commit; Esc cancels.
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.voice.commit"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            Task { await self.handleVoiceKey() }
+            Task { await self.handleVoiceKey(destination: .focusedApp) }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.voice.cancel"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
@@ -171,14 +181,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Voice flow
 
-    private func handleVoiceKey() async {
+    private func handleVoiceKey(destination: RecordingDestination = .focusedApp) async {
         if audioRecorder.isRecording {
-            guard let samples = audioRecorder.stop() else { return }
-            hideRecordingPanel()
+            guard let samples = audioRecorder.stop() else {
+                hideRecordingPanel()
+                return
+            }
+            showRecordingProcessingState()
             do {
-                let text = try await whisperService.transcribe(audio: samples)
-                await pasteService.paste(text)
+                let transcript = try await whisperService.transcribe(
+                    audio: samples,
+                    inputLanguage: settingsStore.whisperInputLanguage
+                )
+                let text = try await preparedDictationOutput(from: transcript)
+                let destination = recordingDestination
+                hideRecordingPanel()
+                deliverDictation(text, to: destination)
             } catch {
+                hideRecordingPanel()
                 showBannerError(error.localizedDescription)
             }
             // Respect the user's "keep model loaded" preference. If they
@@ -199,7 +219,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 showBannerError("Failed to load Whisper model: \(error.localizedDescription)")
                 return
             }
-            focusCapture.capture()
+            if destination == .focusedApp {
+                focusCapture.capture()
+            }
+            recordingDestination = destination
             do {
                 try await audioRecorder.start()
                 showRecordingPanel()
@@ -229,10 +252,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installRecordingKeyMonitor()
     }
 
+    private func showRecordingProcessingState() {
+        removeRecordingKeyMonitor()
+        let state = currentDictationHUDState()
+        let hc = NSHostingController(rootView: RecordingOverlay(state: state, phase: .processing))
+        hc.sizingOptions = .preferredContentSize
+        recordingPanel?.contentViewController = hc
+        if let panel = recordingPanel {
+            panel.setContentSize(hc.view.fittingSize)
+        }
+    }
+
     private func hideRecordingPanel() {
         recordingPanel?.close()
         recordingPanel = nil
         removeRecordingKeyMonitor()
+    }
+
+    private func deliverDictation(_ text: String, to destination: RecordingDestination) {
+        switch destination {
+        case .focusedApp:
+            Task { await pasteService.paste(text) }
+        case .scratchpad:
+            NotificationCenter.default.post(name: NSNotification.Name("typeoh.scratchpad.dictationResult"), object: text)
+        }
+        recordingDestination = .focusedApp
+    }
+
+    private func preparedDictationOutput(from transcript: String) async throws -> String {
+        guard let outputLanguage = settingsStore.whisperOutputLanguage,
+              !outputLanguage.isEmpty else { return transcript }
+
+        if settingsStore.whisperInputLanguage == outputLanguage {
+            return transcript
+        }
+
+        return try await TranslationDispatcher.translate(
+            text: transcript,
+            source: settingsStore.whisperInputLanguage.map(Locale.Language.init(identifier:)),
+            target: Locale.Language(identifier: outputLanguage),
+            using: settingsStore
+        )
     }
 
     /// Snapshot the model + permission state used by the dictation HUD when the
@@ -299,6 +359,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard audioRecorder.isRecording else { return }
         _ = audioRecorder.stop()
         hideRecordingPanel()
+        recordingDestination = .focusedApp
         if !settingsStore.whisperKeepLoaded {
             Task { await whisperService.unload() }
         }
@@ -434,7 +495,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Briefly promote to regular policy so NSApp.activate() raises the window
         // above foreground apps, then revert to the user's preferred policy.
         NSApp.setActivationPolicy(.regular)
-        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
         NSApp.activate()
         NSApp.setActivationPolicy(settingsStore.showInDock ? .regular : .accessory)
     }

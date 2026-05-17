@@ -140,11 +140,12 @@ struct LanguagePicker: View {
 
 /// Searchable popover language picker. Tap the button → popover with a search
 /// field on top, a "Common" section, and the full A–Z list below.
-private struct LangPickerButton: View {
+struct LangPickerButton: View {
     let title: String
     let isAuto: Bool
     let supported: [Locale.Language]
     let includeAuto: Bool
+    var autoTitle: String = "Auto-detect"
     let onSelect: (Locale.Language?) -> Void
 
     @State private var isShowingPopover = false
@@ -213,7 +214,7 @@ private struct LangPickerButton: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     if includeAuto, query.isEmpty {
-                        row(label: "Auto-detect", systemImage: "sparkle") {
+                        row(label: autoTitle, systemImage: "sparkle") {
                             onSelect(nil)
                             isShowingPopover = false
                         }

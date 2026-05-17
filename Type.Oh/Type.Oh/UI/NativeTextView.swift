@@ -29,7 +29,10 @@ final class NativeTextViewController {
         guard textView.shouldChangeText(in: range, replacementString: replacement) else { return }
 
         textStorage.beginEditing()
-        textStorage.replaceCharacters(in: range, with: replacement)
+        textStorage.replaceCharacters(
+            in: range,
+            with: NSAttributedString(string: replacement, attributes: replacementAttributes(for: textView, at: range.location))
+        )
         textStorage.endEditing()
         textView.didChangeText()
         textView.invalidateRenderedText()
@@ -45,12 +48,27 @@ final class NativeTextViewController {
         replaceCharacters(in: NSRange(location: 0, length: textView.string.utf16.count), with: replacement)
     }
 
+    private func replacementAttributes(for textView: NSTextView, at location: Int) -> [NSAttributedString.Key: Any] {
+        var attributes = textView.typingAttributes
+        if location > 0,
+           location <= textView.textStorage?.length ?? 0,
+           let inherited = textView.textStorage?.attributes(at: location - 1, effectiveRange: nil) {
+            attributes.merge(inherited) { current, _ in current }
+        }
+        attributes[.font] = attributes[.font] ?? textView.font ?? NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        attributes[.foregroundColor] = attributes[.foregroundColor] ?? textView.textColor ?? NSColor.labelColor
+        return attributes
+    }
+
     /// Replace the entire contents with no undo registration. Used by `Clear`.
     func resetText(to replacement: String) {
         guard let textView, let textStorage = textView.textStorage else { return }
         let fullRange = NSRange(location: 0, length: textStorage.length)
         textStorage.beginEditing()
-        textStorage.replaceCharacters(in: fullRange, with: replacement)
+        textStorage.replaceCharacters(
+            in: fullRange,
+            with: NSAttributedString(string: replacement, attributes: replacementAttributes(for: textView, at: 0))
+        )
         textStorage.endEditing()
         textView.undoManager?.removeAllActions()
         textView.didChangeText()

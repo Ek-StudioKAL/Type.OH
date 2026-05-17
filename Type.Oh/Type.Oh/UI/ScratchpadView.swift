@@ -89,6 +89,12 @@ struct ScratchpadView: View {
             guard let incoming = note.object as? String, !incoming.isEmpty else { return }
             insertFromExternalSelection(incoming)
         }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSNotification.Name("typeoh.scratchpad.dictationResult"))
+        ) { note in
+            guard let incoming = note.object as? String, !incoming.isEmpty else { return }
+            insertDictationResult(incoming)
+        }
         .onReceive(memoryTickTimer) { _ in
             residentMemoryLabel = MemoryReporter.residentDisplayString()
         }
@@ -251,6 +257,15 @@ struct ScratchpadView: View {
         setStatus("Loaded \(trimmed.count) characters from selection.")
     }
 
+    private func insertDictationResult(_ incoming: String) {
+        let targetRange = textViewController.selectedRange() ?? NSRange(location: (text as NSString).length, length: 0)
+        let prefix = targetRange.location > 0 && !incoming.hasPrefix(" ") && !incoming.hasPrefix("\n") ? " " : ""
+        let replacement = targetRange.length == 0 ? prefix + incoming : incoming
+        textViewController.replaceCharacters(in: targetRange, with: replacement)
+        text = textViewController.currentText ?? text
+        setStatus("Dictation inserted into LazyPad.")
+    }
+
     private func selectedTextRange(in sourceText: String) -> NSRange? {
         guard let range = textViewController.selectedRange(), range.length > 0 else { return nil }
         guard NSMaxRange(range) <= sourceText.utf16.count else { return nil }
@@ -401,13 +416,8 @@ struct ScratchpadView: View {
 
             HStack(spacing: 10) {
                 SettingsLink {
-                    VStack(spacing: 4) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 16, weight: .regular))
-                        Text("Settings")
-                            .font(.caption2)
-                    }
-                    .frame(maxWidth: .infinity)
+                    AccentToolbarLabel(title: "Settings", systemImage: "gearshape")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.plain)
                 .simultaneousGesture(TapGesture().onEnded {
@@ -418,7 +428,7 @@ struct ScratchpadView: View {
                     NSApp.activate(ignoringOtherApps: true)
                 })
 
-                bottomIconButton(title: "Setup", systemImage: "wand.and.stars.inverse") {
+                bottomIconButton(title: "Setup", systemImage: "wand.and.stars") {
                     NotificationCenter.default.post(name: NSNotification.Name("typeoh.showOnboarding"), object: nil)
                 }
             }
@@ -456,7 +466,7 @@ struct ScratchpadView: View {
             }
 
             toolbarButton(title: "Dictate", systemImage: "mic") {
-                NotificationCenter.default.post(name: NSNotification.Name("typeoh.voiceHotkey"), object: nil)
+                NotificationCenter.default.post(name: NSNotification.Name("typeoh.scratchpad.dictation"), object: nil)
             }
 
             toolbarButton(title: "Improve", systemImage: "wand.and.stars") {
@@ -770,13 +780,8 @@ struct ScratchpadView: View {
     @ViewBuilder
     private func bottomIconButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: .regular))
-                Text(title)
-                    .font(.caption2)
-            }
-            .frame(maxWidth: .infinity)
+            AccentToolbarLabel(title: title, systemImage: systemImage)
+                .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
     }

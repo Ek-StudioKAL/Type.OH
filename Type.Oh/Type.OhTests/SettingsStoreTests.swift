@@ -18,6 +18,12 @@ struct SettingsStoreTests {
         #expect(freshStore().whisperModel == "openai_whisper-base")
     }
 
+    @Test func defaultWhisperLanguages() {
+        let store = freshStore()
+        #expect(store.whisperInputLanguage == nil)
+        #expect(store.whisperOutputLanguage == nil)
+    }
+
     @Test func defaultProviderIsAppleOnDevice() {
         #expect(freshStore().activeProvider == .appleOnDevice)
     }

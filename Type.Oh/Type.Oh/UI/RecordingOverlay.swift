@@ -23,20 +23,26 @@ struct DictationHUDState: Equatable {
     }
 }
 
+enum DictationHUDPhase: Equatable {
+    case recording
+    case processing
+}
+
 /// Compact non-activating HUD shown during dictation. Replaces the old
 /// "red-dot + timer" pill with a richer surface:
-/// - Model-loaded indicator (matches Settings → Whisper status).
-/// - Permission badges (AX + mic) — visible only if a permission is missing.
+/// - Model-loaded indicator (matches Settings -> Whisper status).
+/// - Permission badges (AX + mic) visible only if a permission is missing.
 /// - Elapsed timer.
-/// - Done button (commits — transcribe + paste).
-/// - Esc cancels (discards audio).
+/// - Done button (commits: stop, transcribe, paste).
+/// - Processing phase while Whisper is transcribing.
+/// - Esc cancels while still recording.
 ///
 /// The view is purely presentational; AppDelegate owns the recorder lifecycle.
-/// User actions post `typeoh.voice.commit` / `typeoh.voice.cancel` —
-/// AppDelegate routes those back into `handleVoiceKey` (commit) or
-/// `cancelVoiceRecording` (cancel).
+/// User actions post `typeoh.voice.commit` / `typeoh.voice.cancel`; AppDelegate
+/// routes those back into `handleVoiceKey` or `cancelVoiceRecording`.
 struct RecordingOverlay: View {
     let state: DictationHUDState
+    var phase: DictationHUDPhase = .recording
 
     @State private var elapsed = 0
     @State private var pulsing = false
@@ -45,15 +51,18 @@ struct RecordingOverlay: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            recordingIndicator
+            phaseIndicator
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(timeString)
+                Text(primaryLabel)
                     .font(.system(.title3, design: .rounded).monospacedDigit().weight(.semibold))
                     .foregroundStyle(.white)
 
                 HStack(spacing: 6) {
                     modelBadge
+                    if phase == .processing {
+                        badge(icon: "waveform", tint: .accentColor, text: "Processing")
+                    }
                     if !state.axTrusted { permissionBadge(label: "AX", systemImage: "exclamationmark.shield") }
                     if !state.micAuthorized { permissionBadge(label: "Mic", systemImage: "mic.slash") }
                 }
@@ -61,22 +70,24 @@ struct RecordingOverlay: View {
 
             Spacer(minLength: 8)
 
-            Button {
-                NotificationCenter.default.post(name: NSNotification.Name("typeoh.voice.commit"), object: nil)
-            } label: {
-                Text("Done")
-                    .font(.system(.callout, design: .rounded).weight(.semibold))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 5)
-                    .background(Capsule().fill(Color.accentColor))
-                    .foregroundStyle(.white)
+            if phase == .recording {
+                Button {
+                    NotificationCenter.default.post(name: NSNotification.Name("typeoh.voice.commit"), object: nil)
+                } label: {
+                    Text("Done")
+                        .font(.system(.callout, design: .rounded).weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(Color.accentColor))
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .help("Stop and transcribe (Return)")
             }
-            .buttonStyle(.plain)
-            .help("Stop and transcribe (Return)")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .frame(minWidth: 260)
+        .frame(minWidth: phase == .processing ? 300 : 260)
         .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
@@ -86,13 +97,22 @@ struct RecordingOverlay: View {
         .onReceive(clock) { _ in elapsed += 1 }
     }
 
-    private var recordingIndicator: some View {
-        Circle()
-            .fill(.red)
-            .frame(width: 10, height: 10)
-            .scaleEffect(pulsing ? 1.35 : 0.85)
-            .opacity(pulsing ? 1 : 0.5)
-            .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulsing)
+    @ViewBuilder
+    private var phaseIndicator: some View {
+        switch phase {
+        case .recording:
+            Circle()
+                .fill(.red)
+                .frame(width: 10, height: 10)
+                .scaleEffect(pulsing ? 1.35 : 0.85)
+                .opacity(pulsing ? 1 : 0.5)
+                .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulsing)
+        case .processing:
+            ProgressView()
+                .controlSize(.small)
+                .tint(.accentColor)
+                .frame(width: 16, height: 16)
+        }
     }
 
     @ViewBuilder
@@ -131,16 +151,35 @@ struct RecordingOverlay: View {
         .background(Capsule().fill(Color.orange.opacity(0.18)))
     }
 
+    private var primaryLabel: String {
+        switch phase {
+        case .recording:
+            timeString
+        case .processing:
+            "Processing..."
+        }
+    }
+
     private var timeString: String {
         String(format: "%d:%02d", elapsed / 60, elapsed % 60)
     }
 }
 
 #Preview {
-    RecordingOverlay(state: DictationHUDState(
-        modelStatus: .loaded(displayName: "base"),
-        axTrusted: true,
-        micAuthorized: true
-    ))
+    VStack(spacing: 12) {
+        RecordingOverlay(state: DictationHUDState(
+            modelStatus: .loaded(displayName: "base"),
+            axTrusted: true,
+            micAuthorized: true
+        ))
+        RecordingOverlay(
+            state: DictationHUDState(
+                modelStatus: .loaded(displayName: "base"),
+                axTrusted: true,
+                micAuthorized: true
+            ),
+            phase: .processing
+        )
+    }
     .padding()
 }
