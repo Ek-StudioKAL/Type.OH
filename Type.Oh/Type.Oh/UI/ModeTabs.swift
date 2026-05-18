@@ -3,6 +3,7 @@ import SwiftUI
 enum EditorMode: String, CaseIterable {
     case translate = "Translate"
     case style     = "Style"
+    case improve   = "Improve"
     case fix       = "Fix"
 }
 

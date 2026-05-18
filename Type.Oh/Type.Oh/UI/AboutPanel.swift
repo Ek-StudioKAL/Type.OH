@@ -33,6 +33,7 @@ final class AboutPanelController {
         p.isFloatingPanel = true
         p.level = .floating
         p.hasShadow = true
+        p.isMovableByWindowBackground = true
         p.center()
 
         bringToFront(p)

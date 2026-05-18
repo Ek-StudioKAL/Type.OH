@@ -31,6 +31,8 @@ private enum ScratchpadAction {
 }
 
 struct ScratchpadView: View {
+    private static let sidebarAutoHideWidth: CGFloat = 780
+
     @Environment(SettingsStore.self) private var settings
     @Environment(\.openSettings) private var openSettings
 
@@ -47,6 +49,7 @@ struct ScratchpadView: View {
     @State private var targetLanguage = Locale.Language(identifier: "en")
     @State private var hasLoadedTranslationSettings = false
     @State private var isSidebarVisible = true
+    @State private var isTranslationPickerVisible = false
     @State private var residentMemoryLabel = MemoryReporter.residentDisplayString()
     private let memoryTickTimer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
 
@@ -57,23 +60,32 @@ struct ScratchpadView: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
-            toolbar
+        GeometryReader { proxy in
+            let shouldShowSidebar = sidebarIsVisible(for: proxy.size.width)
 
-            HStack(spacing: 0) {
-                if isSidebarVisible {
-                    sidebar
-                    Divider()
+            VStack(spacing: 10) {
+                toolbar(availableWidth: proxy.size.width)
+
+                if isTranslationPickerVisible {
+                    translationOptionsRow
                 }
 
-                editorArea
-            }
+                HStack(spacing: 0) {
+                    if shouldShowSidebar {
+                        sidebar
+                        Divider()
+                    }
 
-            statusBar
+                    editorArea
+                }
+
+                statusBar(availableWidth: proxy.size.width)
+            }
         }
         .padding(14)
-        .frame(minWidth: 960, maxWidth: .infinity, minHeight: 520, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(NativeTranslationDriverView())
+        .focusEffectDisabled()
         .onChange(of: text) {
             store.scheduleSave(text)
         }
@@ -98,6 +110,12 @@ struct ScratchpadView: View {
         .onReceive(memoryTickTimer) { _ in
             residentMemoryLabel = MemoryReporter.residentDisplayString()
         }
+        .onChange(of: settings.sourceLanguage) { _, newValue in
+            sourceLanguage = newValue.map(Locale.Language.init(identifier:))
+        }
+        .onChange(of: settings.targetLanguage) { _, newValue in
+            targetLanguage = Locale.Language(identifier: newValue)
+        }
     }
 
     private var characterCount: Int {
@@ -116,6 +134,10 @@ struct ScratchpadView: View {
         settings.whisperModel
             .replacingOccurrences(of: "openai_whisper-", with: "")
             .replacingOccurrences(of: "_", with: " ")
+    }
+
+    private func sidebarIsVisible(for width: CGFloat) -> Bool {
+        isSidebarVisible && width >= Self.sidebarAutoHideWidth
     }
 
     private func runAction(_ action: ScratchpadAction) {
@@ -457,113 +479,188 @@ struct ScratchpadView: View {
         )
     }
 
-    private var toolbar: some View {
-        HStack(alignment: .top, spacing: 10) {
-            toolbarButton(title: isSidebarVisible ? "Hide" : "Show", systemImage: isSidebarVisible ? "sidebar.left" : "sidebar.right") {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    isSidebarVisible.toggle()
+    private func toolbar(availableWidth: CGFloat) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(alignment: .top, spacing: 10) {
+                toolbarButton(
+                    title: sidebarIsVisible(for: availableWidth) ? "Hide" : "Show",
+                    systemImage: sidebarIsVisible(for: availableWidth) ? "sidebar.left" : "sidebar.right"
+                ) {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        isSidebarVisible.toggle()
+                    }
                 }
-            }
 
-            toolbarButton(title: "Dictate", systemImage: "mic") {
-                NotificationCenter.default.post(name: NSNotification.Name("typeoh.scratchpad.dictation"), object: nil)
-            }
+                toolbarButton(title: "Dictate", systemImage: "mic") {
+                    NotificationCenter.default.post(name: NSNotification.Name("typeoh.scratchpad.dictation"), object: nil)
+                }
 
-            toolbarButton(title: "Improve", systemImage: "wand.and.stars") {
-                runAction(.improve)
-            }
-            .disabled(isProcessing || text.isEmpty)
+                toolbarButton(title: "Improve", systemImage: "wand.and.stars") {
+                    runAction(.improve)
+                }
+                .disabled(isProcessing || text.isEmpty)
 
-            toolbarButton(title: "Fix", systemImage: "square.and.pencil") {
-                runAction(.fix)
-            }
-            .disabled(isProcessing || text.isEmpty)
+                toolbarButton(title: "Fix", systemImage: "square.and.pencil") {
+                    runAction(.fix)
+                }
+                .disabled(isProcessing || text.isEmpty)
 
-            toolbarButton(title: "Concise", literalGlyph: "\u{10080A}") {
-                runAction(.concise)
-            }
-            .disabled(isProcessing || text.isEmpty)
+                toolbarButton(title: "Concise", literalGlyph: "\u{10080A}") {
+                    runAction(.concise)
+                }
+                .disabled(isProcessing || text.isEmpty)
 
-            toolbarButton(title: "Translate", systemImage: "translate") {
-                runAction(.translate)
-            }
-            .disabled(isProcessing || text.isEmpty)
-            .help(currentLanguagePairLabel + " — change defaults in Settings → Translation")
-            .contextMenu {
-                Text(currentLanguagePairLabel)
-                Divider()
-                Button("Translate Now") { runAction(.translate) }
-                if sourceLanguage != nil {
-                    Button("Swap source ⇄ target") {
-                        if let src = sourceLanguage {
-                            sourceLanguage = targetLanguage
-                            targetLanguage = src
+                toolbarButton(title: "Translate", systemImage: "translate") {
+                    runAction(.translate)
+                }
+                .disabled(isProcessing || text.isEmpty)
+                .help(currentLanguagePairLabel + " — change defaults in Settings → Translation")
+                .contextMenu {
+                    Text(currentLanguagePairLabel)
+                    Divider()
+                    Button("Translate Now") { runAction(.translate) }
+                    if sourceLanguage != nil {
+                        Button("Swap source ⇄ target") {
+                            if let src = sourceLanguage {
+                                sourceLanguage = targetLanguage
+                                targetLanguage = src
+                                persistTranslationSettings()
+                            }
+                        }
+                        Button("Reset source to auto-detect") {
+                            sourceLanguage = nil
                             persistTranslationSettings()
                         }
                     }
-                    Button("Reset source to auto-detect") {
-                        sourceLanguage = nil
-                        persistTranslationSettings()
+                    Button("Open Translation Settings…") {
+                        openSettingsAt(.translation)
                     }
                 }
-                Button("Open Translation Settings…") {
-                    openSettingsAt(.translation)
+
+                toolbarButton(title: "Lang", systemImage: isTranslationPickerVisible ? "chevron.up" : "globe") {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        isTranslationPickerVisible.toggle()
+                    }
                 }
-            }
+                .help(currentLanguagePairLabel)
 
-            Spacer(minLength: 12)
+                Spacer(minLength: 12)
 
-            toolbarButton(title: "Paste", systemImage: "arrowshape.turn.up.right") {
-                Task { await pasteToLastApp() }
-            }
-            .disabled(text.isEmpty)
+                toolbarButton(title: "Paste", systemImage: "arrowshape.turn.up.right") {
+                    Task { await pasteToLastApp() }
+                }
+                .disabled(text.isEmpty)
 
-            toolbarButton(title: "Copy", systemImage: "doc.on.doc") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
-                setStatus("Copied full text to clipboard.")
-            }
-            .disabled(text.isEmpty)
+                toolbarButton(title: "Copy", systemImage: "doc.on.doc") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(text, forType: .string)
+                    setStatus("Copied full text to clipboard.")
+                }
+                .disabled(text.isEmpty)
 
-            toolbarButton(title: "Clear", systemImage: "trash") {
-                textViewController.resetText(to: "")
-                text = ""
-                selectedRange = NSRange(location: 0, length: 0)
-                store.scheduleSave(text)
-                setStatus("Scratchpad cleared.")
+                toolbarButton(title: "Clear", systemImage: "trash") {
+                    textViewController.resetText(to: "")
+                    text = ""
+                    selectedRange = NSRange(location: 0, length: 0)
+                    store.scheduleSave(text)
+                    setStatus("Scratchpad cleared.")
+                }
+                .disabled(isProcessing || text.isEmpty)
             }
-            .disabled(isProcessing || text.isEmpty)
+            .frame(minWidth: availableWidth, alignment: .leading)
         }
         .padding(.horizontal, 2)
     }
 
-    private var statusBar: some View {
-        HStack {
-            HStack(spacing: 6) {
-                Text("\(characterCount) characters")
-                Text("•")
-                Text("\(wordCount) words")
+    private var translationOptionsRow: some View {
+        HStack(spacing: 10) {
+            LanguagePicker(
+                sourceLanguage: $sourceLanguage,
+                targetLanguage: $targetLanguage,
+                compact: true,
+                availability: settings.translationProvider == .nativeOS ? .nativeOSOffline : .allLocaleLanguages
+            )
+            .onChange(of: sourceLanguage) { persistTranslationSettings() }
+            .onChange(of: targetLanguage) { persistTranslationSettings() }
+
+            Text(translationScopeHint)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 8)
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    isTranslationPickerVisible = false
+                }
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(.secondary)
             }
+            .buttonStyle(.plain)
+            .help("Hide language selection")
+        }
+        .padding(.horizontal, 2)
+    }
 
-            Spacer()
+    private func statusBar(availableWidth: CGFloat) -> some View {
+        let isCompact = availableWidth < Self.sidebarAutoHideWidth
 
-            HStack(spacing: 6) {
-                Text("Whisper: \(whisperModelStatusLabel)")
-                Text("•")
-                Text("Provider: \(providerStatusLabel)")
-                Text("•")
-                Text("Mem: \(residentMemoryLabel)")
-                    .help("Resident memory footprint")
+        return Group {
+            if isCompact {
+                VStack(alignment: .leading, spacing: 4) {
+                    statusCounts
+                    HStack(spacing: 8) {
+                        statusDetails
+                        Spacer(minLength: 8)
+                        statusText
+                    }
+                }
+            } else {
+                HStack {
+                    statusCounts
+
+                    Spacer()
+
+                    statusDetails
+                        .multilineTextAlignment(.center)
+
+                    Spacer()
+
+                    statusText
+                }
             }
-            .multilineTextAlignment(.center)
-
-            Spacer()
-
-            Text(statusMessage)
-                .foregroundStyle(statusIsError ? .red : .secondary)
         }
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+
+    private var statusCounts: some View {
+        HStack(spacing: 6) {
+            Text("\(characterCount) characters")
+            Text("•")
+            Text("\(wordCount) words")
+        }
+    }
+
+    private var statusDetails: some View {
+        HStack(spacing: 6) {
+            Text("Whisper: \(whisperModelStatusLabel)")
+            Text("•")
+            Text("Provider: \(providerStatusLabel)")
+            Text("•")
+            Text("Mem: \(residentMemoryLabel)")
+                .help("Resident memory footprint")
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
+    }
+
+    private var statusText: some View {
+        Text(statusMessage)
+            .lineLimit(1)
+            .foregroundStyle(statusIsError ? .red : .secondary)
     }
 
     @ViewBuilder

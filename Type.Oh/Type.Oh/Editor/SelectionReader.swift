@@ -20,11 +20,11 @@ final class SelectionReader {
             return CapturedSelection(text: text, isEditable: axResult.isEditable)
         }
 
-        // AX gave us nothing. Try the clipboard fallback. We can't reliably know
-        // editability without AX, so we assume editable=false to be safe (route
-        // to LazyPad) unless AX *positively* confirmed editability.
+        // AX gave us nothing. Try the clipboard fallback. Browser/Electron apps
+        // often fail selected-text AX reads, but if they accepted Command-C they
+        // can usually accept Command-V back into the same selection.
         let copied = await readViaCopy(from: app)
-        return CapturedSelection(text: copied, isEditable: axResult.isEditable)
+        return CapturedSelection(text: copied, isEditable: copied != nil || axResult.isEditable)
     }
 
     // MARK: - AX path
@@ -57,9 +57,7 @@ final class SelectionReader {
         }
         let focused = unsafeBitCast(focusedRef, to: AXUIElement.self)
 
-        var settable: DarwinBoolean = false
-        AXUIElementIsAttributeSettable(focused, kAXSelectedTextAttribute as CFString, &settable)
-        let editable = settable.boolValue
+        let editable = canEditText(in: focused)
 
         var selectedRef: CFTypeRef?
         let selError = AXUIElementCopyAttributeValue(focused, kAXSelectedTextAttribute as CFString, &selectedRef)
@@ -69,6 +67,28 @@ final class SelectionReader {
         let text = selectedRef as? String
         let nonEmpty = (text?.isEmpty == false) ? text : nil
         return AXReadResult(text: nonEmpty, isEditable: editable)
+    }
+
+    private func canEditText(in element: AXUIElement) -> Bool {
+        if isAttributeSettable(kAXSelectedTextAttribute, in: element) {
+            return true
+        }
+        if isAttributeSettable(kAXValueAttribute, in: element) {
+            return true
+        }
+
+        var roleRef: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef)
+        let role = roleRef as? String
+        return role == kAXTextAreaRole as String || role == kAXTextFieldRole as String
+    }
+
+    private func isAttributeSettable(_ attribute: String, in element: AXUIElement) -> Bool {
+        var settable = DarwinBoolean(false)
+        guard AXUIElementIsAttributeSettable(element, attribute as CFString, &settable) == .success else {
+            return false
+        }
+        return settable.boolValue
     }
 
     // MARK: - Clipboard fallback (⌘C)

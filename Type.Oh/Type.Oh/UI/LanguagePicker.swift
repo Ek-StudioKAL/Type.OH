@@ -181,6 +181,7 @@ struct LangPickerButton: View {
             )
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
         .popover(isPresented: $isShowingPopover, arrowEdge: .bottom) {
             popoverContent
                 .frame(width: 280, height: 360)

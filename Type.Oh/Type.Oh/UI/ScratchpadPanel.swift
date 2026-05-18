@@ -8,6 +8,7 @@ final class ScratchpadPanel: NSWindow {
 
 @MainActor
 final class ScratchpadPanelController {
+    private static let minimumWindowSize = CGSize(width: 780, height: 240)
     private let panel: ScratchpadPanel
 
     init(settingsStore: SettingsStore, pasteService: PasteService, store: ScratchpadStore) {
@@ -25,8 +26,8 @@ final class ScratchpadPanelController {
         )
         panel.title = "LazyPad"
         panel.contentViewController = hostingController
-        panel.setContentSize(CGSize(width: 1180, height: 720))
-        panel.minSize = CGSize(width: 960, height: 520)
+        panel.setContentSize(CGSize(width: 1180, height: 740))
+        panel.minSize = Self.minimumWindowSize
         panel.isReleasedWhenClosed = false
         panel.level = .normal
         panel.collectionBehavior = [.fullScreenPrimary, .fullScreenAllowsTiling]
@@ -43,6 +44,7 @@ final class ScratchpadPanelController {
 
     func show(using settingsStore: SettingsStore, insertingText: String? = nil) {
         NSApp.setActivationPolicy(.regular)
+        enforceMinimumWindowSize()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
@@ -58,5 +60,16 @@ final class ScratchpadPanelController {
                 )
             }
         }
+    }
+
+    private func enforceMinimumWindowSize() {
+        let frame = panel.frame
+        let width = max(frame.width, Self.minimumWindowSize.width)
+        let height = max(frame.height, Self.minimumWindowSize.height)
+        guard width != frame.width || height != frame.height else { return }
+        panel.setFrame(
+            NSRect(x: frame.minX, y: frame.maxY - height, width: width, height: height),
+            display: true
+        )
     }
 }

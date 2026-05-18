@@ -378,6 +378,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               captured.text?.count ?? -1,
               captured.isEditable ? 1 : 0)
 
+        if captured.text == nil, !AXIsProcessTrusted() {
+            ToastOverlay.shared.show("Grant Accessibility permission, then retry ReType.")
+            return
+        }
+
         // If the source app can't accept a paste-back (PDF viewer, web-view
         // static text, image OCR, etc.) the ReType compact panel is useless —
         // the user can't apply the rewrite anywhere. Route to LazyPad with the
@@ -403,7 +408,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     editorPanel?.close()
                     editorPanel = nil
                 }
-                Task { await self.pasteService.paste(result) }
+                Task { await self.pasteService.paste(result, preferDirectReplacement: true) }
             },
             onCancel: { [weak self] in
                 self?.editorPanel?.close()
@@ -413,11 +418,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         .environment(settingsStore)
 
         let hc = NSHostingController(rootView: content)
-        hc.sizingOptions = .preferredContentSize
+        hc.sizingOptions = []
         let panel = makePanel(titled: true)
         panel.title = "ReType • AI Editor"
         panel.contentViewController = hc
-        panel.minSize = CGSize(width: 460, height: 220)
+        let fixedSize = CGSize(width: 560, height: 300)
+        panel.styleMask.remove(.resizable)
+        panel.setContentSize(fixedSize)
+        panel.contentMinSize = fixedSize
+        panel.contentMaxSize = fixedSize
+        panel.minSize = panel.frameRect(forContentRect: NSRect(origin: .zero, size: fixedSize)).size
+        panel.maxSize = panel.minSize
         panel.center()
         bringPanelFront(panel)
         editorPanel = panel
@@ -487,6 +498,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.backgroundColor = titled ? .windowBackgroundColor : .clear
         panel.isOpaque        = titled
         panel.hasShadow       = true
+        panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         return panel
     }

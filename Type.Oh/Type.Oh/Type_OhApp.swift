@@ -15,6 +15,7 @@ struct TypeOhApp: App {
         Settings {
             SettingsWindow()
                 .environment(appDelegate.settingsStore)
+                .focusEffectDisabled()
         }
     }
 }

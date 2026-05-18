@@ -93,6 +93,8 @@ struct RecordingOverlay: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
         )
+        .background(NativeTranslationDriverView())
+        .focusEffectDisabled()
         .onAppear { pulsing = true }
         .onReceive(clock) { _ in elapsed += 1 }
     }

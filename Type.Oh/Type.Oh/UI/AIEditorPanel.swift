@@ -59,6 +59,7 @@ struct AIEditorPanel: View {
         .padding(14)
         .frame(minWidth: 480, idealWidth: 560, maxWidth: 900)
         .background(NativeTranslationDriverView())
+        .focusEffectDisabled()
         .onAppear { loadTranslationSettingsIfNeeded() }
     }
 
@@ -68,6 +69,9 @@ struct AIEditorPanel: View {
         HStack(alignment: .top, spacing: 10) {
             toolbarButton(title: "Fix", systemImage: "square.and.pencil", isActive: mode == .fix) {
                 setMode(.fix)
+            }
+            toolbarButton(title: "Improve", systemImage: "wand.and.stars", isActive: mode == .improve) {
+                setMode(.improve)
             }
             toolbarButton(title: "Style", systemImage: "paintbrush", isActive: mode == .style) {
                 setMode(.style)
@@ -301,6 +305,7 @@ struct AIEditorPanel: View {
         switch mode {
         case .translate: "Translate"
         case .style:     "Stylize"
+        case .improve:   "Improve"
         case .fix:       "Fix"
         }
     }
@@ -309,6 +314,7 @@ struct AIEditorPanel: View {
         switch mode {
         case .translate: "Translate"
         case .style:     "Style: \(selectedStyle?.label ?? "—")"
+        case .improve:   "Improve"
         case .fix:       "Fix"
         }
     }
@@ -365,6 +371,15 @@ struct AIEditorPanel: View {
 
         do {
             switch mode {
+            case .improve:
+                let preset = StylePreset(
+                    id: "retype-improve",
+                    label: "Improve",
+                    emoji: "✨",
+                    promptFragment: "Rewrite the following text to improve clarity, flow, tone, and readability while preserving its meaning. Keep it natural and polished."
+                )
+                result = try await provider.applyStyle(preset, to: editableInput, emojify: settings.emojify)
+                setStatus("Improve complete.")
             case .style:
                 guard let preset = selectedStyle else {
                     setErrorStatus("Select a style preset first.")

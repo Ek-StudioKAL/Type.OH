@@ -12,12 +12,18 @@ final class PasteService {
         self.focusCapture = focusCapture
     }
 
-    func paste(_ text: String) async {
+    func paste(_ text: String, preferDirectReplacement: Bool = false) async {
+        focusCapture.restore()
+        // Give the target app time to become key before replacement or paste arrives.
+        try? await Task.sleep(for: .milliseconds(180))
+
+        if preferDirectReplacement,
+           await focusCapture.replaceCapturedSelection(with: text) {
+            return
+        }
+
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        focusCapture.restore()
-        // Give the target app time to become key before the keystroke arrives.
-        try? await Task.sleep(for: .milliseconds(150))
         simulatePaste()
     }
 
