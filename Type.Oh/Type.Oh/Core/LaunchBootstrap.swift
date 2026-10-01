@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import AVFoundation
+import Combine
 import Foundation
 
 /// Drives the launch splash: runs a small sequence of warm-up tasks, reports
