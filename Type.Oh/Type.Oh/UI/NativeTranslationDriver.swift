@@ -1,5 +1,19 @@
 import SwiftUI
+#if canImport(Translation)
 import Translation
+#endif
+
+/// Whether the native macOS Translation framework (macOS 15+) can be used at
+/// runtime. On older releases the `.nativeOS` engine is hidden and any stored
+/// selection falls back to the cloud engine.
+enum NativeTranslationSupport {
+    static var isAvailable: Bool {
+        #if canImport(Translation)
+        if #available(macOS 15.0, *) { return true }
+        #endif
+        return false
+    }
+}
 
 /// Bridges the imperative `TranslationDispatcher.translate(.nativeOS, ...)`
 /// call into the SwiftUI-driven `TranslationSession` API.
@@ -13,16 +27,18 @@ import Translation
 ///    optionally prompting the user to download the language pack.
 /// 4. The driver calls `session.translate(_:)` and resolves the continuation.
 @MainActor
-@Observable
-final class NativeTranslationCoordinator {
+final class NativeTranslationCoordinator: ObservableObject {
     static let shared = NativeTranslationCoordinator()
 
     /// Bumped on every new request so SwiftUI re-evaluates the
     /// `.translationTask(_:)` even when the configuration values are identical
     /// to the previous run.
-    private(set) var generation: Int = 0
-    private(set) var pendingConfiguration: TranslationSession.Configuration?
-    private(set) var pendingText: String?
+    @Published private(set) var generation: Int = 0
+    /// A `TranslationSession.Configuration` when the framework exists. Stored
+    /// type-erased because stored properties can't carry an availability
+    /// narrower than their type.
+    @Published private(set) var pendingConfigurationBox: Any?
+    @Published private(set) var pendingText: String?
     private var continuation: CheckedContinuation<String, Error>?
 
     private init() {}
@@ -32,6 +48,9 @@ final class NativeTranslationCoordinator {
         source: Locale.Language?,
         target: Locale.Language
     ) async throws -> String {
+        guard NativeTranslationSupport.isAvailable else {
+            throw TranslationDispatcher.Failure.nativeUnavailable
+        }
         // Cancel any in-flight request that was abandoned.
         if let stale = continuation {
             continuation = nil
@@ -40,18 +59,20 @@ final class NativeTranslationCoordinator {
         return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<String, Error>) in
             self.continuation = cont
             self.pendingText = text
+            #if canImport(Translation)
             if #available(macOS 26.4, *) {
-                self.pendingConfiguration = TranslationSession.Configuration(
+                self.pendingConfigurationBox = TranslationSession.Configuration(
                     source: source,
                     target: target,
                     preferredStrategy: .lowLatency
                 )
-            } else {
-                self.pendingConfiguration = TranslationSession.Configuration(
+            } else if #available(macOS 15.0, *) {
+                self.pendingConfigurationBox = TranslationSession.Configuration(
                     source: source,
                     target: target
                 )
             }
+            #endif
             self.generation &+= 1
         }
     }
@@ -61,7 +82,7 @@ final class NativeTranslationCoordinator {
         let cont = continuation
         continuation = nil
         pendingText = nil
-        pendingConfiguration = nil
+        pendingConfigurationBox = nil
         switch result {
         case .success(let s): cont?.resume(returning: s)
         case .failure(let e): cont?.resume(throwing: e)
@@ -70,9 +91,26 @@ final class NativeTranslationCoordinator {
 }
 
 /// Hidden host view that lets `TranslationSession` run inside a SwiftUI
-/// hierarchy. Place it as an overlay anywhere — it draws nothing.
-struct NativeTranslationDriverView: View {
-    @State private var coord = NativeTranslationCoordinator.shared
+/// hierarchy. Place it as an overlay anywhere — it draws nothing. On macOS
+/// releases without the Translation framework it is an empty view.
+@MainActor struct NativeTranslationDriverView: View {
+    var body: some View {
+        #if canImport(Translation)
+        if #available(macOS 15.0, *) {
+            NativeTranslationDriverBody()
+        } else {
+            EmptyView()
+        }
+        #else
+        EmptyView()
+        #endif
+    }
+}
+
+#if canImport(Translation)
+@available(macOS 15.0, *)
+@MainActor private struct NativeTranslationDriverBody: View {
+    @ObservedObject private var coord = NativeTranslationCoordinator.shared
 
     var body: some View {
         // A zero-size Color keeps the view in the hierarchy without affecting
@@ -80,7 +118,7 @@ struct NativeTranslationDriverView: View {
         Color.clear
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
-            .translationTask(coord.pendingConfiguration) { session in
+            .translationTask(coord.pendingConfigurationBox as? TranslationSession.Configuration) { session in
                 guard let text = coord.pendingText else { return }
                 do {
                     let response = try await session.translate(text)
@@ -94,3 +132,4 @@ struct NativeTranslationDriverView: View {
             .id(coord.generation)
     }
 }
+#endif

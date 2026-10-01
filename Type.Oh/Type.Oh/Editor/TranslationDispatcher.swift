@@ -1,14 +1,16 @@
 import Foundation
 
 /// Routes the Translate action to whichever engine the user picked in
-/// Settings → Translation. Falls back gracefully if no engine is selected
-/// (callers handle the `engineUnselected` error by opening Settings).
+/// Settings → Translation. With no explicit choice the default engine
+/// (`TranslationProviderID.preferred`, Google Translate) is used, so
+/// translation works out of the box without any setup.
 @MainActor
 enum TranslationDispatcher {
 
     enum Failure: LocalizedError {
         case engineUnselected
         case nativeMissingLanguagePack
+        case nativeUnavailable
         case noActiveProvider
 
         var errorDescription: String? {
@@ -17,6 +19,8 @@ enum TranslationDispatcher {
                 "Pick a translation engine in Settings → Translation."
             case .nativeMissingLanguagePack:
                 "macOS doesn't have a language pack for this pair. Pick the language from a translate panel to trigger the download prompt."
+            case .nativeUnavailable:
+                "Native macOS translation needs macOS 15 or later. Switch the engine to Cloud Provider in Settings → Translation."
             case .noActiveProvider:
                 "No active cloud provider — set one in Settings → Providers, or switch the translation engine."
             }
@@ -29,24 +33,24 @@ enum TranslationDispatcher {
         target: Locale.Language,
         using settings: SettingsStore
     ) async throws -> String {
-        guard let engine = settings.translationProvider else {
-            throw Failure.engineUnselected
-        }
+        let engine = settings.translationProvider ?? .preferred
 
         switch engine {
+        case .googleTranslate:
+            return try await GoogleTranslateService.shared.translate(
+                text: text,
+                source: source,
+                target: target
+            ).text
+
         case .nativeOS:
+            guard NativeTranslationSupport.isAvailable else {
+                throw Failure.nativeUnavailable
+            }
             return try await NativeTranslationCoordinator.shared.translate(
                 text: text,
                 source: source,
                 target: target
-            )
-
-        case .localLLM:
-            let provider = AppleOnDeviceProvider()
-            return try await provider.translate(
-                text: text,
-                sourceLanguage: source.map(localized),
-                targetLanguage: localized(target)
             )
 
         case .apiLLM:

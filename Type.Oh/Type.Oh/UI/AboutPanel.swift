@@ -21,7 +21,7 @@ final class AboutPanelController {
             }
         )
 
-        let hostingView = NSHostingView(rootView: content)
+        let hostingView = NSHostingView(rootView: content.typeOhAccent())
         let p = NSPanel(
             contentRect: CGRect(origin: .zero, size: hostingView.fittingSize),
             styleMask: [.titled, .closable, .nonactivatingPanel],
@@ -45,7 +45,7 @@ final class AboutPanelController {
         let prior = NSApp.activationPolicy()
         NSApp.setActivationPolicy(.regular)
         p.makeKeyAndOrderFront(nil)
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true)
         if prior != .regular {
             NSApp.setActivationPolicy(prior)
         }
@@ -57,7 +57,7 @@ final class AboutPanelController {
     }
 }
 
-private struct AboutPanelContent: View {
+@MainActor private struct AboutPanelContent: View {
     let onOpenSettings: () -> Void
     let onClose: () -> Void
 
@@ -82,9 +82,9 @@ private struct AboutPanelContent: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Hotkeys")
                     .font(.headline)
-                hotkeyRow("F13", label: "Voice Dictation")
-                hotkeyRow("F14", label: "AI Editor")
-                hotkeyRow("F15", label: "LazyPad")
+                hotkeyRow(HotkeyConfig.defaultVoice.displayString, label: "Voice Dictation")
+                hotkeyRow(HotkeyConfig.defaultEditor.displayString, label: "AI Editor")
+                hotkeyRow(HotkeyConfig.defaultScratchpad.displayString, label: "LazyPad")
             }
 
             Divider()

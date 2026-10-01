@@ -8,14 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Type.OH** (also called iLazyKey) is a native macOS menu-bar app with two flows triggered by global hotkeys:
 
-1. **Voice → Text** (`⌃F13`): Record speech → transcribe locally via WhisperKit → paste at cursor.
-2. **AI Editor** (`⌥F13`): Select text in any app → floating panel → Translate / Style / Fix → replace in place.
+1. **Voice → Text** (`⌃⌥D`): Record speech → transcribe locally via WhisperKit → paste at cursor.
+2. **AI Editor** (`⌃⌥R`, LazyPad `⌃⌥L`; also `typeoh://dictate|retype|lazypad|settings` URLs): Select text in any app → floating panel → Translate / Style / Fix → replace in place.
 
 Everything runs locally by default (WhisperKit on Neural Engine, Apple Foundation Models, Apple Translation). Optionally, users bring their own Anthropic / OpenAI / Google API key stored in the macOS Keychain.
 
 ## Requirements
 
-- **macOS 26 Tahoe+**, **Apple Silicon**, **Apple Intelligence enabled** (required for Foundation Models)
+- **macOS 26 Tahoe+**, **Apple Silicon** for the Xcode project (Apple Intelligence was removed from the code; see "macOS 13 / Intel build" below for the Ventura path)
 - **Xcode 17+**
 - Swift Package: `https://github.com/argmaxinc/WhisperKit`
 
@@ -77,6 +77,25 @@ Single app target. Key components by folder:
 - **`FoundationModels` requires macOS 26 + Apple Intelligence.** There is no macOS 15 fallback in v0.1 — that's a post-MVP exploration.
 - **Whisper `translate` mode is audio→English only** — it cannot rewrite text. Voice and text-editing are strictly separate pipelines.
 - **Action Extension (Services menu / right-click) is v2 backlog**, not MVP. The original PRD for it is preserved in `CONTEXT.md §7`.
+
+## macOS 13 / Intel build (no Xcode)
+
+`Package.swift` + `build-app.sh` build the app with a swift.org Swift 5.10
+toolchain and the Command Line Tools SDK (macOS 13.3). WhisperKit 0.10.1 and
+swift-transformers 0.1.8 are vendored under `Vendor/` (patched; see
+`Vendor/README.md`). On this build:
+
+- No `FoundationModels` / Apple on-device provider — `ProviderID` has only the
+  cloud providers; `ProviderID.fallback` (Anthropic) is the default.
+- The `Translation` framework is compiled only when the SDK has it
+  (`#if canImport(Translation)`); `NativeTranslationSupport.isAvailable`
+  gates the native engine at runtime.
+- State objects are `ObservableObject` (`@Published`), not `@Observable`;
+  views use `@EnvironmentObject` / `@ObservedObject`. Settings opens via
+  `SettingsWindowOpener` (no `openSettings` environment action on macOS 13).
+- Every SwiftUI view struct is marked `@MainActor` (implied by newer SDKs).
+- The tests use Swift Testing, which the 5.10 toolchain lacks; they can't run
+  on the Intel machine.
 
 ## Entitlements Required
 

@@ -1,15 +1,22 @@
 import Foundation
-import Observation
 
 struct HotkeyConfig: Codable, Equatable, Sendable {
     var keyCode: UInt32
     var modifiers: UInt32
 
-    // Extended F-keys F13 (105), F14 (107), F15 (113) make great global
-    // shortcuts — almost no app uses them and they're chord-free.
-    static let defaultVoice      = HotkeyConfig(keyCode: 105, modifiers: 0) // F13
-    static let defaultEditor     = HotkeyConfig(keyCode: 107, modifiers: 0) // F14
-    static let defaultScratchpad = HotkeyConfig(keyCode: 113, modifiers: 0) // F15
+    /// ⌃⌥ + letter: exists on every MacBook keyboard (no F13–F15 there),
+    /// unused by macOS defaults, and mnemonic — D(ictate), R(eType), L(azyPad).
+    static let controlOption: UInt32 = 0x1000 | 0x0800 // Carbon controlKey | optionKey
+    static let defaultVoice      = HotkeyConfig(keyCode: 2,  modifiers: controlOption) // ⌃⌥D
+    static let defaultEditor     = HotkeyConfig(keyCode: 15, modifiers: controlOption) // ⌃⌥R
+    static let defaultScratchpad = HotkeyConfig(keyCode: 37, modifiers: controlOption) // ⌃⌥L
+
+    /// Defaults of earlier builds (extended F-keys, external keyboards only).
+    /// A settings file that still holds exactly these is migrated to the new
+    /// defaults on load; anything the user chose themselves is kept.
+    static let legacyVoice       = HotkeyConfig(keyCode: 105, modifiers: 0) // F13
+    static let legacyEditor      = HotkeyConfig(keyCode: 107, modifiers: 0) // F14
+    static let legacyScratchpad  = HotkeyConfig(keyCode: 113, modifiers: 0) // F15
 }
 
 struct CustomStylePreset: Codable, Identifiable, Equatable, Sendable {
@@ -23,79 +30,108 @@ struct CustomStylePreset: Codable, Identifiable, Equatable, Sendable {
     static let maxCount = 8
 }
 
+/// Cloud text-AI providers. The Apple on-device provider (FoundationModels /
+/// Apple Intelligence) was removed: it needs macOS 26 on Apple Silicon and this
+/// build targets macOS 13 on Intel.
 enum ProviderID: String, Codable, CaseIterable, Sendable {
-    case appleOnDevice = "apple"
     case anthropic     = "anthropic"
     case openAI        = "openai"
     case google        = "google"
 
+    /// Provider used when settings are fresh or reference a provider that no
+    /// longer exists (e.g. "apple" written by an older build).
+    static let fallback: ProviderID = .anthropic
+
     var displayName: String {
         switch self {
-        case .appleOnDevice: "Apple (On-Device)"
         case .anthropic:     "Anthropic Claude"
         case .openAI:        "OpenAI GPT"
         case .google:        "Google Gemini"
         }
     }
 
-    var requiresAPIKey: Bool { self != .appleOnDevice }
+    var requiresAPIKey: Bool { true }
+
+    /// Tolerant decoding so a settings.json written by a build that still had
+    /// the Apple provider doesn't invalidate every other setting.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = ProviderID(rawValue: raw) ?? .fallback
+    }
 }
 
 /// Which engine handles the Translate action across the app.
 enum TranslationProviderID: String, Codable, CaseIterable, Sendable {
+    /// Google Translate's free public endpoint — no key, no account. The
+    /// main engine (see `GoogleTranslateService`).
+    case googleTranslate = "googleTranslate"
     /// Native macOS TranslationSession — no LLM, downloadable language
-    /// packs, runs fully offline.
+    /// packs, runs fully offline. Needs the Translation framework (macOS 15+).
     case nativeOS    = "nativeOS"
-    /// Apple FoundationModels (on-device LLM). Higher quality, slower.
-    case localLLM    = "localLLM"
     /// Whatever cloud provider (`SettingsStore.activeProvider`) the user
     /// has configured.
     case apiLLM      = "apiLLM"
 
+    /// Engines that can actually run on this macOS. Native translation is
+    /// hidden on releases without the Translation framework.
+    static var availableCases: [TranslationProviderID] {
+        allCases.filter { $0 != .nativeOS || NativeTranslationSupport.isAvailable }
+    }
+
+    /// Engine used when the user hasn't chosen one.
+    static let preferred: TranslationProviderID = .googleTranslate
+
     var displayName: String {
         switch self {
+        case .googleTranslate: "Google Translate (free)"
         case .nativeOS: "Native macOS (offline)"
-        case .localLLM: "Apple On-Device LLM"
         case .apiLLM:   "Cloud Provider (API key)"
         }
     }
 
     var detail: String {
         switch self {
+        case .googleTranslate: "Uses Google Translate's public web service. Free, no key, 100+ languages, needs internet. Unofficial: heavy use can be rate-limited for a while."
         case .nativeOS: "Uses macOS Translation. Fast, offline, limited languages, no AI rewrite — but may sound stiffer."
-        case .localLLM: "Uses Apple's on-device language model. Free, private, slower than Native OS."
         case .apiLLM:   "Uses your selected cloud provider — best quality, costs API credits."
         }
     }
+
+    /// "localLLM" (the removed Apple on-device LLM engine) and any unknown
+    /// value decode as the default engine instead of failing the whole
+    /// settings file.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = TranslationProviderID(rawValue: raw) ?? .preferred
+    }
 }
 
-@Observable
 @MainActor
-final class SettingsStore {
-    var whisperModel:    String        = "openai_whisper-base"
-    var whisperInputLanguage: String?  = nil     // nil = auto-detect
-    var whisperOutputLanguage: String? = nil     // nil = keep spoken language
-    var voiceHotkey:     HotkeyConfig  = .defaultVoice
-    var editorHotkey:    HotkeyConfig  = .defaultEditor
-    var scratchpadHotkey: HotkeyConfig? = .defaultScratchpad
-    var activeProvider:  ProviderID    = .appleOnDevice
-    var sourceLanguage:  String?       = nil     // nil = auto-detect
-    var targetLanguage:  String        = "en"
-    var emojify:         Bool          = false
-    var spellingAssistanceEnabled: Bool = true
-    var grammarAssistanceEnabled: Bool = true
-    var textReplacementEnabled: Bool   = true
-    var launchAtLogin:   Bool          = false
-    var showInDock:      Bool          = true
-    var hasCompletedOnboarding: Bool   = false
-    var customStylePresets: [CustomStylePreset] = []
+final class SettingsStore: ObservableObject {
+    @Published var whisperModel:    String        = "openai_whisper-base"
+    @Published var whisperInputLanguage: String?  = nil     // nil = auto-detect
+    @Published var whisperOutputLanguage: String? = nil     // nil = keep spoken language
+    @Published var voiceHotkey:     HotkeyConfig  = .defaultVoice
+    @Published var editorHotkey:    HotkeyConfig  = .defaultEditor
+    @Published var scratchpadHotkey: HotkeyConfig? = .defaultScratchpad
+    @Published var activeProvider:  ProviderID    = .fallback
+    @Published var sourceLanguage:  String?       = nil     // nil = auto-detect
+    @Published var targetLanguage:  String        = "en"
+    @Published var emojify:         Bool          = false
+    @Published var spellingAssistanceEnabled: Bool = true
+    @Published var grammarAssistanceEnabled: Bool = true
+    @Published var textReplacementEnabled: Bool   = true
+    @Published var launchAtLogin:   Bool          = false
+    @Published var showInDock:      Bool          = true
+    @Published var hasCompletedOnboarding: Bool   = false
+    @Published var customStylePresets: [CustomStylePreset] = []
     // Translation framework — picks which engine handles the Translate flow.
     // `nil` means "ask me on first use" (auto-open Settings → Translation).
-    var translationProvider: TranslationProviderID? = nil
+    @Published var translationProvider: TranslationProviderID? = nil
     /// When true (the default), Whisper stays loaded in memory between dictations
-    /// so subsequent ⌃F13 presses are instant. Turn off to free ~200 MB-3 GB
+    /// so subsequent dictation hotkey presses are instant. Turn off to free ~200 MB-3 GB
     /// while idle, at the cost of a 1-5 s warm-up on next use.
-    var whisperKeepLoaded: Bool = true
+    @Published var whisperKeepLoaded: Bool = true
 
     private let fileURL: URL
 
@@ -120,6 +156,18 @@ final class SettingsStore {
         guard let data = try? Data(contentsOf: fileURL),
               let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
         snap.apply(to: self)
+        if migrateLegacyHotkeys() { save() }
+    }
+
+    /// Replace the old F13/F14/F15 defaults with the MacBook-friendly chords.
+    /// Returns true when anything changed.
+    @discardableResult
+    func migrateLegacyHotkeys() -> Bool {
+        var changed = false
+        if voiceHotkey == .legacyVoice { voiceHotkey = .defaultVoice; changed = true }
+        if editorHotkey == .legacyEditor { editorHotkey = .defaultEditor; changed = true }
+        if scratchpadHotkey == .legacyScratchpad { scratchpadHotkey = .defaultScratchpad; changed = true }
+        return changed
     }
 }
 
@@ -143,6 +191,7 @@ private extension SettingsStore {
         var translationProvider: TranslationProviderID?
         var whisperKeepLoaded: Bool?
 
+        @MainActor
         init(_ s: SettingsStore) {
             whisperModel   = s.whisperModel
             whisperInputLanguage = s.whisperInputLanguage
@@ -166,6 +215,7 @@ private extension SettingsStore {
             whisperKeepLoaded = s.whisperKeepLoaded
         }
 
+        @MainActor
         func apply(to s: SettingsStore) {
             s.whisperModel   = whisperModel
             s.whisperInputLanguage = whisperInputLanguage
@@ -191,7 +241,13 @@ private extension SettingsStore {
             s.showInDock     = showInDock ?? true
             s.hasCompletedOnboarding = hasCompletedOnboarding ?? false
             s.customStylePresets = customStylePresets ?? []
-            s.translationProvider = translationProvider
+            // Native macOS translation can't run without the Translation framework;
+            // fall back to the default engine rather than failing every translate.
+            if translationProvider == .nativeOS, !NativeTranslationSupport.isAvailable {
+                s.translationProvider = .preferred
+            } else {
+                s.translationProvider = translationProvider
+            }
             s.whisperKeepLoaded = whisperKeepLoaded ?? true
         }
     }

@@ -1,5 +1,4 @@
 import Foundation
-import Observation
 import WhisperKit
 
 extension Notification.Name {
@@ -12,9 +11,8 @@ struct WhisperModelInfo: Identifiable, Sendable {
     let sizeDescription: String
 }
 
-@Observable
 @MainActor
-final class ModelManager {
+final class ModelManager: ObservableObject {
     static let shared = ModelManager()
 
     let catalogue: [WhisperModelInfo] = [
@@ -25,10 +23,10 @@ final class ModelManager {
         WhisperModelInfo(id: "openai_whisper-large-v3",displayName: "large-v3",sizeDescription: "~3 GB"),
     ]
 
-    private(set) var downloadProgress: Double = 0
-    private(set) var downloadingModelID: String?
-    private(set) var lastError: String?
-    private(set) var loadedModelID: String?
+    @Published private(set) var downloadProgress: Double = 0
+    @Published private(set) var downloadingModelID: String?
+    @Published private(set) var lastError: String?
+    @Published private(set) var loadedModelID: String?
 
     var isDownloading: Bool { downloadingModelID != nil }
 

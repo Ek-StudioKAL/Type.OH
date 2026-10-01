@@ -48,7 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         HotkeyManager.shared.onScratchpadHotkey = { [weak self] in
             guard let self else { return }
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self.openScratchpad()
             }
         }
@@ -56,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showAbout"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self.showAboutPanel()
             }
         }
@@ -70,25 +70,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.editorHotkey.sticky"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self.showEditorPanel(with: "", sticky: true)
             }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showOnboarding"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self.showOnboarding()
             }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.openScratchpad"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self.openScratchpad()
             }
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.hotkeysChanged"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            MainActor.assumeIsolated {
+            Task { @MainActor in
                 self.applyHotkeys()
             }
         }
@@ -124,7 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.voice.cancel"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
-            MainActor.assumeIsolated { self.cancelVoiceRecording() }
+            Task { @MainActor in self.cancelVoiceRecording() }
         }
 
         // First-launch onboarding handles permission prompts and warm-ups
@@ -150,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.hideLaunchSplash()
         }
 
-        let hc = NSHostingController(rootView: content)
+        let hc = NSHostingController(rootView: content.typeOhAccent())
         hc.sizingOptions = .preferredContentSize
         let panel = makePanel(titled: false)
         panel.contentViewController = hc
@@ -172,6 +172,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func hideLaunchSplash() {
         splashPanel?.close()
         splashPanel = nil
+    }
+
+    // MARK: - URL scheme (typeoh://dictate | retype | lazypad | settings)
+    //
+    // Lets anything outside the app trigger the same actions as the hotkeys —
+    // Touch Bar Quick Actions (see touchbar/), Shortcuts, scripts:
+    //     open -g "typeoh://dictate"
+    // `-g` keeps the caller's app frontmost so focus capture / paste-back work.
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            let action = (url.host ?? url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))).lowercased()
+            NSLog("[Type.OH] URL action: %@", action)
+            switch action {
+            case "dictate", "voice":
+                Task { await self.handleVoiceKey(destination: .focusedApp) }
+            case "retype", "editor":
+                Task { await self.handleEditorKey() }
+            case "lazypad", "scratchpad":
+                openScratchpad()
+            case "settings":
+                SettingsWindowOpener.open()
+            default:
+                ToastOverlay.shared.show("Unknown Type.OH action: \(action)")
+            }
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -234,7 +260,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showRecordingPanel() {
         let state = currentDictationHUDState()
-        let hc = NSHostingController(rootView: RecordingOverlay(state: state))
+        let hc = NSHostingController(rootView: RecordingOverlay(state: state).typeOhAccent())
         hc.sizingOptions = .preferredContentSize
         let panel = makePanel(titled: false)
         panel.contentViewController = hc
@@ -255,7 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showRecordingProcessingState() {
         removeRecordingKeyMonitor()
         let state = currentDictationHUDState()
-        let hc = NSHostingController(rootView: RecordingOverlay(state: state, phase: .processing))
+        let hc = NSHostingController(rootView: RecordingOverlay(state: state, phase: .processing).typeOhAccent())
         hc.sizingOptions = .preferredContentSize
         recordingPanel?.contentViewController = hc
         if let panel = recordingPanel {
@@ -415,9 +441,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.editorPanel = nil
             }
         )
-        .environment(settingsStore)
+        .environmentObject(settingsStore)
 
-        let hc = NSHostingController(rootView: content)
+        let hc = NSHostingController(rootView: content.typeOhAccent())
         hc.sizingOptions = []
         let panel = makePanel(titled: true)
         panel.title = "ReType • AI Editor"
@@ -451,9 +477,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.onboardingPanel = nil
             self?.openScratchpad()
         })
-        .environment(settingsStore)
+        .environmentObject(settingsStore)
 
-        let hc = NSHostingController(rootView: content)
+        let hc = NSHostingController(rootView: content.typeOhAccent())
         hc.sizingOptions = .preferredContentSize
         let panel = makePanel(titled: true)
         panel.title = "Welcome to Type.OH"
@@ -504,11 +530,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func bringPanelFront(_ panel: NSPanel) {
-        // Briefly promote to regular policy so NSApp.activate() raises the window
+        // Briefly promote to regular policy so NSApp.activate(ignoringOtherApps: true) raises the window
         // above foreground apps, then revert to the user's preferred policy.
         NSApp.setActivationPolicy(.regular)
         panel.orderFrontRegardless()
-        NSApp.activate()
+        NSApp.activate(ignoringOtherApps: true)
         NSApp.setActivationPolicy(settingsStore.showInDock ? .regular : .accessory)
     }
 

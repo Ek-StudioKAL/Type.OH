@@ -24,8 +24,8 @@ struct SettingsStoreTests {
         #expect(store.whisperOutputLanguage == nil)
     }
 
-    @Test func defaultProviderIsAppleOnDevice() {
-        #expect(freshStore().activeProvider == .appleOnDevice)
+    @Test func defaultProviderIsAnthropic() {
+        #expect(freshStore().activeProvider == .anthropic)
     }
 
     @Test func defaultShowInDockIsTrue() {
@@ -36,31 +36,44 @@ struct SettingsStoreTests {
         #expect(freshStore().hasCompletedOnboarding == false)
     }
 
-    @Test func defaultStoreScratchpadHotkeyIsF15() {
+    @Test func defaultStoreScratchpadHotkeyIsDefault() {
         #expect(freshStore().scratchpadHotkey == .defaultScratchpad)
     }
 
     // MARK: - Hotkey defaults
 
-    @Test func defaultVoiceHotkeyIsF13() {
-        #expect(HotkeyConfig.defaultVoice.keyCode == 105)
-        #expect(HotkeyConfig.defaultVoice.modifiers == 0)
+    @Test func defaultVoiceHotkeyIsControlOptionD() {
+        #expect(HotkeyConfig.defaultVoice.keyCode == 2)
+        #expect(HotkeyConfig.defaultVoice.modifiers == HotkeyConfig.controlOption)
     }
 
-    @Test func defaultEditorHotkeyIsF14() {
-        #expect(HotkeyConfig.defaultEditor.keyCode == 107)
-        #expect(HotkeyConfig.defaultEditor.modifiers == 0)
+    @Test func defaultEditorHotkeyIsControlOptionR() {
+        #expect(HotkeyConfig.defaultEditor.keyCode == 15)
+        #expect(HotkeyConfig.defaultEditor.modifiers == HotkeyConfig.controlOption)
     }
 
-    @Test func defaultScratchpadHotkeyIsF15() {
-        #expect(HotkeyConfig.defaultScratchpad.keyCode == 113)
-        #expect(HotkeyConfig.defaultScratchpad.modifiers == 0)
+    @Test func defaultScratchpadHotkeyIsControlOptionL() {
+        #expect(HotkeyConfig.defaultScratchpad.keyCode == 37)
+        #expect(HotkeyConfig.defaultScratchpad.modifiers == HotkeyConfig.controlOption)
+    }
+
+    @Test func legacyFKeyDefaultsMigrateButCustomHotkeysStay() {
+        let store = freshStore()
+        store.voiceHotkey = .legacyVoice
+        store.editorHotkey = HotkeyConfig(keyCode: 0, modifiers: HotkeyConfig.controlOption) // custom ⌃⌥A
+        store.scratchpadHotkey = .legacyScratchpad
+        #expect(store.migrateLegacyHotkeys())
+        #expect(store.voiceHotkey == .defaultVoice)
+        #expect(store.editorHotkey.keyCode == 0)
+        #expect(store.scratchpadHotkey == .defaultScratchpad)
+        #expect(store.migrateLegacyHotkeys() == false)
     }
 
     // MARK: - ProviderID
 
-    @Test func appleOnDeviceRequiresNoKey() {
-        #expect(ProviderID.appleOnDevice.requiresAPIKey == false)
+    @Test func removedAppleProviderDecodesAsFallback() throws {
+        let decoded = try JSONDecoder().decode(ProviderID.self, from: Data("\"apple\"".utf8))
+        #expect(decoded == .fallback)
     }
 
     @Test func cloudProvidersRequireKey() {

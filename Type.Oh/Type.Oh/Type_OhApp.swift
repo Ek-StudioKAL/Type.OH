@@ -7,21 +7,22 @@ struct TypeOhApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarContent()
-                .environment(appDelegate.settingsStore)
+                .environmentObject(appDelegate.settingsStore)
+                .typeOhAccent()
         } label: {
             MenuBarIconLabel()
         }
 
         Settings {
             SettingsWindow()
-                .environment(appDelegate.settingsStore)
-                .focusEffectDisabled()
+                .environmentObject(appDelegate.settingsStore)
+                .typeOhAccent()
+                
         }
     }
 }
 
-private struct MenuBarIconLabel: View {
-    @Environment(\.openSettings) private var openSettings
+@MainActor private struct MenuBarIconLabel: View {
 
     var body: some View {
         Image(nsImage: menuBarImage)
@@ -54,8 +55,6 @@ private struct MenuBarIconLabel: View {
     }
 
     private func openSettingsWindow() {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        openSettings()
+        SettingsWindowOpener.open()
     }
 }

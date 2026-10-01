@@ -1,7 +1,6 @@
 import SwiftUI
 
-struct MenuBarContent: View {
-    @Environment(\.openSettings) private var openSettings
+@MainActor struct MenuBarContent: View {
 
     var body: some View {
         Button("LazyPad") {
@@ -17,9 +16,7 @@ struct MenuBarContent: View {
         }
 
         Button("Settings…") {
-            NSApp.setActivationPolicy(.regular)
-            NSApp.activate(ignoringOtherApps: true)
-            openSettings()
+            SettingsWindowOpener.open()
         }
 
         Divider()

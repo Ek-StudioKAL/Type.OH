@@ -11,10 +11,34 @@ actor WhisperService {
     /// Load (or reload) the model from the exact folder URL returned by ModelManager.download().
     func loadModel(name: String, at folderURL: URL) async throws {
         if loadedModel == name, whisperKit != nil { return }
-        let config = WhisperKitConfig(model: name, modelFolder: folderURL.path, download: false)
+        let config = WhisperKitConfig(
+            model: name,
+            modelFolder: folderURL.path,
+            computeOptions: Self.computeOptions,
+            download: false
+        )
         whisperKit = try await WhisperKit(config)
         loadedModel = name
         await ModelManager.shared.markLoaded(name)
+    }
+
+    /// Intel Macs have no Neural Engine, so WhisperKit's Apple Silicon defaults
+    /// (`cpuAndNeuralEngine`) don't apply. Measured on a 2017 MacBook Pro
+    /// (Radeon Pro, macOS 13.7): the text decoder returns garbage on the GPU,
+    /// and Core ML's pure-CPU path crashes inside the mel model, so mel and
+    /// encoder run on the GPU and the decoder on the CPU. That combination
+    /// transcribes a 5 s clip with `base` in about 4 s.
+    private static var computeOptions: ModelComputeOptions? {
+        #if arch(x86_64)
+        return ModelComputeOptions(
+            melCompute: .cpuAndGPU,
+            audioEncoderCompute: .cpuAndGPU,
+            textDecoderCompute: .cpuOnly,
+            prefillCompute: .cpuOnly
+        )
+        #else
+        return nil
+        #endif
     }
 
     /// Ensure the model is loaded before transcription; loads on-demand if needed.

@@ -67,6 +67,19 @@ enum KeychainStore {
         return status == errSecSuccess
     }
 
+    private static func readKeychain(for provider: ProviderID) -> (status: OSStatus, value: String?) {
+        var query = baseQuery(for: provider)
+        query[kSecReturnData] = true
+        query[kSecMatchLimit] = kSecMatchLimitOne
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecSuccess, let data = result as? Data {
+            return (status, String(data: data, encoding: .utf8))
+        }
+        return (status, nil)
+    }
+
     /// Loads the key from cache if present, otherwise from the keychain.
     /// **May prompt the user** on the first call per session if the keychain
     /// hasn't trusted this binary. Subsequent calls are silent.
@@ -74,20 +87,25 @@ enum KeychainStore {
         let cached = cached(provider)
         if cached.hit { return cached.value }
 
-        var query = baseQuery(for: provider)
-        query[kSecReturnData] = true
-        query[kSecMatchLimit] = kSecMatchLimitOne
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        let loaded: String?
-        if status == errSecSuccess, let data = result as? Data {
-            loaded = String(data: data, encoding: .utf8)
-        } else {
-            loaded = nil
-        }
+        let loaded = readKeychain(for: provider).value
         setCached(provider, loaded)
         return loaded
+    }
+
+    /// Performs an explicit keychain data read, bypassing the in-memory cache.
+    /// Use this from setup flows to make macOS ask for Keychain authorization
+    /// at a predictable time instead of during the first provider request.
+    @discardableResult
+    static func authorizeAccess(for provider: ProviderID) -> Bool {
+        guard provider.requiresAPIKey else { return true }
+        let result = readKeychain(for: provider)
+        if result.status == errSecSuccess || result.status == errSecItemNotFound {
+            setCached(provider, result.value)
+        } else {
+            clearCache(provider)
+        }
+        let loaded = result.value
+        return loaded != nil
     }
 
     @discardableResult
@@ -126,7 +144,14 @@ enum KeychainStore {
     /// On unsigned dev builds this still produces *one* prompt at launch, but
     /// the user only sees it once per session.
     static func prefetch(_ provider: ProviderID) {
-        guard provider != .appleOnDevice else { return }
+        guard provider.requiresAPIKey else { return }
         _ = load(for: provider)
+    }
+
+    /// Authorize every configured cloud provider in one setup pass.
+    static func authorizeAllProviderAccess() {
+        for provider in ProviderID.allCases where provider.requiresAPIKey {
+            _ = load(for: provider)
+        }
     }
 }

@@ -40,7 +40,7 @@ enum DictationHUDPhase: Equatable {
 /// The view is purely presentational; AppDelegate owns the recorder lifecycle.
 /// User actions post `typeoh.voice.commit` / `typeoh.voice.cancel`; AppDelegate
 /// routes those back into `handleVoiceKey` or `cancelVoiceRecording`.
-struct RecordingOverlay: View {
+@MainActor struct RecordingOverlay: View {
     let state: DictationHUDState
     var phase: DictationHUDPhase = .recording
 
@@ -94,7 +94,6 @@ struct RecordingOverlay: View {
                 .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
         )
         .background(NativeTranslationDriverView())
-        .focusEffectDisabled()
         .onAppear { pulsing = true }
         .onReceive(clock) { _ in elapsed += 1 }
     }
@@ -165,23 +164,4 @@ struct RecordingOverlay: View {
     private var timeString: String {
         String(format: "%d:%02d", elapsed / 60, elapsed % 60)
     }
-}
-
-#Preview {
-    VStack(spacing: 12) {
-        RecordingOverlay(state: DictationHUDState(
-            modelStatus: .loaded(displayName: "base"),
-            axTrusted: true,
-            micAuthorized: true
-        ))
-        RecordingOverlay(
-            state: DictationHUDState(
-                modelStatus: .loaded(displayName: "base"),
-                axTrusted: true,
-                micAuthorized: true
-            ),
-            phase: .processing
-        )
-    }
-    .padding()
 }

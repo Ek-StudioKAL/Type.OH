@@ -7,7 +7,7 @@ enum EditorMode: String, CaseIterable {
     case fix       = "Fix"
 }
 
-struct ModeTabs: View {
+@MainActor struct ModeTabs: View {
     @Binding var mode: EditorMode
 
     var body: some View {

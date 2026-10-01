@@ -78,7 +78,7 @@ final class NativeTextViewController {
     }
 }
 
-struct NativeTextView: NSViewRepresentable {
+@MainActor struct NativeTextView: NSViewRepresentable {
     @Binding var text: String
     @Binding var selectedRange: NSRange
     let spellingAssistanceEnabled: Bool

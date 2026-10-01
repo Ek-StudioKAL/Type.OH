@@ -1,4 +1,5 @@
 import Testing
+import Foundation
 @testable import Type_Oh
 
 struct TranslationProviderTests {
@@ -11,8 +12,8 @@ struct TranslationProviderTests {
     }
 
     @Test func translationProviderRawValuesRemainStable() {
+        #expect(TranslationProviderID.googleTranslate.rawValue == "googleTranslate")
         #expect(TranslationProviderID.nativeOS.rawValue == "nativeOS")
-        #expect(TranslationProviderID.localLLM.rawValue == "localLLM")
         #expect(TranslationProviderID.apiLLM.rawValue == "apiLLM")
     }
 
@@ -36,5 +37,33 @@ struct TranslationProviderTests {
         let error = TranslationDispatcher.Failure.noActiveProvider
 
         #expect(error.errorDescription?.contains("cloud provider") == true)
+    }
+
+    @Test func defaultTranslationEngineIsGoogleTranslate() {
+        #expect(TranslationProviderID.preferred == .googleTranslate)
+    }
+
+    @Test func googleTranslateParsesSentencesAndDetectedLanguage() throws {
+        let json = #"[[["שלום עולם. ","Hello world. ",null,null,3],["מה שלומך?","How are you?",null,null,3]],null,"en"]"#
+        let result = try GoogleTranslateService.parse(Data(json.utf8))
+        #expect(result.text == "שלום עולם. מה שלומך?")
+        #expect(result.detectedSourceLanguage == "en")
+    }
+
+    @Test func googleTranslateParsesChromeExtensionShapes() throws {
+        let auto = try GoogleTranslateService.parseChromeExtension(Data(#"[["Hallo Welt.\n\nZweiter Absatz.","en"]]"#.utf8))
+        #expect(auto.text == "Hallo Welt.\n\nZweiter Absatz.")
+        #expect(auto.detectedSourceLanguage == "en")
+        let explicit = try GoogleTranslateService.parseChromeExtension(Data(#"["Where is the library?"]"#.utf8))
+        #expect(explicit.text == "Where is the library?")
+        #expect(explicit.detectedSourceLanguage == nil)
+    }
+
+    @Test func googleLanguageCodesUseGoogleSpellings() {
+        #expect(GoogleTranslateService.googleCode(for: Locale.Language(identifier: "zh-Hans")) == "zh-CN")
+        #expect(GoogleTranslateService.googleCode(for: Locale.Language(identifier: "zh-Hant")) == "zh-TW")
+        #expect(GoogleTranslateService.googleCode(for: Locale.Language(identifier: "he")) == "iw")
+        #expect(GoogleTranslateService.googleCode(for: Locale.Language(identifier: "en")) == "en")
+        #expect(GoogleTranslateService.googleCode(for: Locale.Language(identifier: "pt-BR")) == "pt")
     }
 }

@@ -30,11 +30,10 @@ private enum ScratchpadAction {
     }
 }
 
-struct ScratchpadView: View {
+@MainActor struct ScratchpadView: View {
     private static let sidebarAutoHideWidth: CGFloat = 780
 
-    @Environment(SettingsStore.self) private var settings
-    @Environment(\.openSettings) private var openSettings
+    @EnvironmentObject private var settings: SettingsStore
 
     let pasteService: PasteService
     let store: ScratchpadStore
@@ -85,9 +84,8 @@ struct ScratchpadView: View {
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(NativeTranslationDriverView())
-        .focusEffectDisabled()
-        .onChange(of: text) {
-            store.scheduleSave(text)
+        .onChange(of: text) { newText in
+            store.scheduleSave(newText)
         }
         .onAppear {
             loadTranslationSettingsIfNeeded()
@@ -110,10 +108,10 @@ struct ScratchpadView: View {
         .onReceive(memoryTickTimer) { _ in
             residentMemoryLabel = MemoryReporter.residentDisplayString()
         }
-        .onChange(of: settings.sourceLanguage) { _, newValue in
+        .onChange(of: settings.sourceLanguage) { newValue in
             sourceLanguage = newValue.map(Locale.Language.init(identifier:))
         }
-        .onChange(of: settings.targetLanguage) { _, newValue in
+        .onChange(of: settings.targetLanguage) { newValue in
             targetLanguage = Locale.Language(identifier: newValue)
         }
     }
@@ -437,18 +435,9 @@ struct ScratchpadView: View {
             Divider()
 
             HStack(spacing: 10) {
-                SettingsLink {
-                    AccentToolbarLabel(title: "Settings", systemImage: "gearshape")
-                        .frame(maxWidth: .infinity)
+                bottomIconButton(title: "Settings", systemImage: "gearshape") {
+                    SettingsWindowOpener.open()
                 }
-                .buttonStyle(.plain)
-                .simultaneousGesture(TapGesture().onEnded {
-                    // SettingsLink only flips the scene; we also need the app
-                    // promoted so the window comes to the front when LazyPad
-                    // is foreground.
-                    NSApp.setActivationPolicy(.regular)
-                    NSApp.activate(ignoringOtherApps: true)
-                })
 
                 bottomIconButton(title: "Setup", systemImage: "wand.and.stars") {
                     NotificationCenter.default.post(name: NSNotification.Name("typeoh.showOnboarding"), object: nil)
@@ -505,12 +494,12 @@ struct ScratchpadView: View {
                 }
                 .disabled(isProcessing || text.isEmpty)
 
-                toolbarButton(title: "Concise", literalGlyph: "\u{10080A}") {
+                toolbarButton(title: "Concise", systemImage: "scissors") {
                     runAction(.concise)
                 }
                 .disabled(isProcessing || text.isEmpty)
 
-                toolbarButton(title: "Translate", systemImage: "translate") {
+                toolbarButton(title: "Translate", systemImage: "character.book.closed") {
                     runAction(.translate)
                 }
                 .disabled(isProcessing || text.isEmpty)
@@ -546,6 +535,8 @@ struct ScratchpadView: View {
 
                 Spacer(minLength: 12)
 
+                // Grouped: the macOS 13 SDK's ViewBuilder takes at most 10 children.
+                Group {
                 toolbarButton(title: "Paste", systemImage: "arrowshape.turn.up.right") {
                     Task { await pasteToLastApp() }
                 }
@@ -566,6 +557,7 @@ struct ScratchpadView: View {
                     setStatus("Scratchpad cleared.")
                 }
                 .disabled(isProcessing || text.isEmpty)
+                }
             }
             .frame(minWidth: availableWidth, alignment: .leading)
         }
@@ -580,8 +572,8 @@ struct ScratchpadView: View {
                 compact: true,
                 availability: settings.translationProvider == .nativeOS ? .nativeOSOffline : .allLocaleLanguages
             )
-            .onChange(of: sourceLanguage) { persistTranslationSettings() }
-            .onChange(of: targetLanguage) { persistTranslationSettings() }
+            .onChange(of: sourceLanguage) { _ in persistTranslationSettings() }
+            .onChange(of: targetLanguage) { _ in persistTranslationSettings() }
 
             Text(translationScopeHint)
                 .font(.caption)
@@ -684,7 +676,6 @@ struct ScratchpadView: View {
 
     private func providerSymbol(for provider: ProviderID) -> String {
         switch provider {
-        case .appleOnDevice: "apple.logo"
         case .anthropic: "text.quote"
         case .openAI: "bubble.left.and.bubble.right"
         case .google: "g.circle"
@@ -693,7 +684,6 @@ struct ScratchpadView: View {
 
     private var currentProviderToolbarTitle: String {
         switch settings.activeProvider {
-        case .appleOnDevice: "Apple"
         case .anthropic: "Claude"
         case .openAI: "ChatGPT"
         case .google: "Google"
@@ -702,7 +692,6 @@ struct ScratchpadView: View {
 
     private func providerMenuTitle(for provider: ProviderID) -> String {
         switch provider {
-        case .appleOnDevice: "Apple (On-Device)"
         case .anthropic: "Anthropic Claude"
         case .openAI: "OpenAI ChatGPT"
         case .google: "Google Gemini"
@@ -773,14 +762,7 @@ struct ScratchpadView: View {
     /// And we write the pending tab to UserDefaults so `.onAppear` consumes it
     /// when the SettingsWindow body is freshly mounted.
     private func openSettingsAt(_ tab: SettingsTab) {
-        SettingsTabRoute.setPendingTab(tab)
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        openSettings()
-        NotificationCenter.default.post(
-            name: SettingsTabRoute.notificationName,
-            object: tab.rawValue
-        )
+        SettingsWindowOpener.open(at: tab)
     }
 
     @ViewBuilder
@@ -852,25 +834,12 @@ struct ScratchpadView: View {
     @ViewBuilder
     private func providerSidebarIcon(for provider: ProviderID) -> some View {
         switch provider {
-        case .appleOnDevice:
-            Image(systemName: "apple.intelligence")
-                .font(.system(size: 15, weight: .regular))
-                .symbolRenderingMode(.hierarchical)
         case .anthropic:
-            Image("Claude")
-                .resizable()
-                .renderingMode(.template)
-                .scaledToFit()
+            BrandImage(name: "Claude")
         case .openAI:
-            Image("GPT")
-                .resizable()
-                .renderingMode(.template)
-                .scaledToFit()
+            BrandImage(name: "GPT")
         case .google:
-            Image("Gemini")
-                .resizable()
-                .renderingMode(.template)
-                .scaledToFit()
+            BrandImage(name: "Gemini")
         }
     }
 

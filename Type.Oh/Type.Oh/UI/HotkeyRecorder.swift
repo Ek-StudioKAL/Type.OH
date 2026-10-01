@@ -50,7 +50,7 @@ func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: Ho
     return nil
 }
 
-struct HotkeyConfigurationEditor: View {
+@MainActor struct HotkeyConfigurationEditor: View {
     @Binding var voiceHotkey: HotkeyConfig
     @Binding var editorHotkey: HotkeyConfig
     @Binding var scratchpadHotkey: HotkeyConfig?
@@ -84,7 +84,7 @@ struct HotkeyConfigurationEditor: View {
                 onClear: { scratchpadHotkey = .defaultScratchpad }
             )
 
-            Text("Defaults are F13 for Voice, F14 for AI Editor, and F15 for LazyPad. F13–F19 work without modifiers; everything else needs ⌘ / ⌃ / ⌥ / ⇧.")
+            Text("Defaults are \(HotkeyConfig.defaultVoice.displayString) for Voice, \(HotkeyConfig.defaultEditor.displayString) for AI Editor, and \(HotkeyConfig.defaultScratchpad.displayString) for LazyPad. Shortcuts need ⌘ / ⌃ / ⌥ / ⇧, except F13–F19 on extended keyboards.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -125,7 +125,7 @@ struct HotkeyConfigurationEditor: View {
     }
 }
 
-struct HotkeyRecorderField: NSViewRepresentable {
+@MainActor struct HotkeyRecorderField: NSViewRepresentable {
     @Binding var hotkey: HotkeyConfig?
 
     func makeCoordinator() -> Coordinator {
@@ -186,7 +186,26 @@ final class HotkeyRecorderButton: NSButton {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override var acceptsFirstResponder: Bool { true }
+    /// Only take keyboard focus while recording. On macOS 13, a key press that
+    /// reaches `NSControl.keyDown` outside recording (e.g. Tab after a capture)
+    /// enters AppKit's keyboard-UI traversal (`selectNextKeyView`), and SwiftUI's
+    /// focus bridge recurses on it endlessly — the Settings window hangs at
+    /// 100% CPU. Staying out of the key-view loop avoids that path entirely.
+    override var acceptsFirstResponder: Bool { isRecording }
+    override var canBecomeKeyView: Bool { false }
+    override var needsPanelToBecomeKey: Bool { false }
+
+    override func keyDown(with event: NSEvent) {
+        // The local monitor handles keys while recording; when not recording
+        // swallow the event instead of letting NSControl run keyboard UI.
+        if isRecording { capture(event) }
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Cmd-shortcuts pressed while recording are ours (the monitor consumes
+        // them); otherwise let the window handle them normally.
+        isRecording
+    }
 
     deinit {
         if let monitor = eventMonitor {
@@ -216,6 +235,10 @@ final class HotkeyRecorderButton: NSButton {
         isRecording = false
         removeMonitor()
         updateDisplay()
+        // Give focus back to the window so later key presses don't land here.
+        if let window, window.firstResponder === self {
+            window.makeFirstResponder(nil)
+        }
     }
 
     private func installMonitor() {
@@ -283,17 +306,23 @@ final class HotkeyRecorderButton: NSButton {
     }
 
     private func updateDisplay() {
+        let newTitle: String
         if isRecording {
             let symbols = modifierSymbols(
                 for: carbonModifiers(
                     from: NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
                 )
             )
-            title = symbols.isEmpty ? "Type shortcut" : "\(symbols)…"
+            newTitle = symbols.isEmpty ? "Type shortcut" : "\(symbols)…"
         } else {
-            title = displayedHotkey?.displayString ?? "Not set"
+            newTitle = displayedHotkey?.displayString ?? "Not set"
         }
-        needsDisplay = true
+        // Only touch `title` when it changes: every assignment invalidates
+        // layout, which re-enters SwiftUI's updateNSView.
+        if title != newTitle {
+            title = newTitle
+            needsDisplay = true
+        }
     }
 }
 

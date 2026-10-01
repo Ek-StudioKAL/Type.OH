@@ -13,9 +13,9 @@ final class ScratchpadPanelController {
 
     init(settingsStore: SettingsStore, pasteService: PasteService, store: ScratchpadStore) {
         let content = ScratchpadView(pasteService: pasteService, store: store)
-            .environment(settingsStore)
+            .environmentObject(settingsStore)
 
-        let hostingController = NSHostingController(rootView: content)
+        let hostingController = NSHostingController(rootView: content.typeOhAccent())
         hostingController.sizingOptions = []
 
         panel = ScratchpadPanel(

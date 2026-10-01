@@ -1,12 +1,14 @@
 import SwiftUI
+#if canImport(Translation)
 import Translation
+#endif
 
 enum LanguagePickerAvailability: Equatable {
     case allLocaleLanguages
     case nativeOSOffline
 }
 
-struct LanguagePicker: View {
+@MainActor struct LanguagePicker: View {
     @Binding var sourceLanguage: Locale.Language?
     @Binding var targetLanguage: Locale.Language
     /// When true the row is compact (no headings, narrower spacing) so it fits
@@ -87,12 +89,17 @@ struct LanguagePicker: View {
         case .allLocaleLanguages:
             return allLocaleLanguages()
         case .nativeOSOffline:
+            #if canImport(Translation)
             if #available(macOS 26.4, *) {
                 let availability = LanguageAvailability(preferredStrategy: .lowLatency)
                 return sortedUniqueLanguages(await availability.supportedLanguages)
-            } else {
+            } else if #available(macOS 15.0, *) {
                 return sortedUniqueLanguages(await LanguageAvailability().supportedLanguages)
             }
+            #endif
+            // No Translation framework on this macOS: native engine can't run,
+            // so offer the full locale list like the cloud engine does.
+            return allLocaleLanguages()
         }
     }
 
@@ -140,7 +147,7 @@ struct LanguagePicker: View {
 
 /// Searchable popover language picker. Tap the button → popover with a search
 /// field on top, a "Common" section, and the full A–Z list below.
-struct LangPickerButton: View {
+@MainActor struct LangPickerButton: View {
     let title: String
     let isAuto: Bool
     let supported: [Locale.Language]
@@ -181,7 +188,6 @@ struct LangPickerButton: View {
             )
         }
         .buttonStyle(.plain)
-        .focusEffectDisabled()
         .popover(isPresented: $isShowingPopover, arrowEdge: .bottom) {
             popoverContent
                 .frame(width: 280, height: 360)

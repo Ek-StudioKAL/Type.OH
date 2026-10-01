@@ -2,9 +2,8 @@ import AppKit
 import ApplicationServices
 import SwiftUI
 
-struct AIEditorPanel: View {
-    @Environment(SettingsStore.self) private var settings
-    @Environment(\.openSettings) private var openSettings
+@MainActor struct AIEditorPanel: View {
+    @EnvironmentObject private var settings: SettingsStore
 
     let originalText: String
     let isSticky: Bool
@@ -59,7 +58,6 @@ struct AIEditorPanel: View {
         .padding(14)
         .frame(minWidth: 480, idealWidth: 560, maxWidth: 900)
         .background(NativeTranslationDriverView())
-        .focusEffectDisabled()
         .onAppear { loadTranslationSettingsIfNeeded() }
     }
 
@@ -76,7 +74,7 @@ struct AIEditorPanel: View {
             toolbarButton(title: "Style", systemImage: "paintbrush", isActive: mode == .style) {
                 setMode(.style)
             }
-            toolbarButton(title: "Translate", systemImage: "translate", isActive: mode == .translate) {
+            toolbarButton(title: "Translate", systemImage: "character.book.closed", isActive: mode == .translate) {
                 setMode(.translate)
             }
             .contextMenu {
@@ -134,8 +132,8 @@ struct AIEditorPanel: View {
                 compact: true,
                 availability: settings.translationProvider == .nativeOS ? .nativeOSOffline : .allLocaleLanguages
             )
-            .onChange(of: sourceLanguage) { persistTranslationSettings() }
-            .onChange(of: targetLanguage) { persistTranslationSettings() }
+            .onChange(of: sourceLanguage) { _ in persistTranslationSettings() }
+            .onChange(of: targetLanguage) { _ in persistTranslationSettings() }
 
             Spacer(minLength: 8)
 
@@ -427,20 +425,13 @@ struct AIEditorPanel: View {
     /// SwiftUI Settings scene reliably surface on the requested tab whether
     /// it's already alive or being mounted for the first time.
     private func openSettingsAt(_ tab: SettingsTab) {
-        SettingsTabRoute.setPendingTab(tab)
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        openSettings()
-        NotificationCenter.default.post(
-            name: SettingsTabRoute.notificationName,
-            object: tab.rawValue
-        )
+        SettingsWindowOpener.open(at: tab)
     }
 }
 
 /// A sidebar row with full-width hit area, hover tint, and selection state.
 /// Used in LazyPad for style presets, custom presets, and provider switching.
-struct SidebarHoverRow<Content: View>: View {
+@MainActor struct SidebarHoverRow<Content: View>: View {
     var isSelected: Bool = false
     let action: () -> Void
     @ViewBuilder let content: () -> Content
@@ -486,7 +477,7 @@ struct SidebarHoverRow<Content: View>: View {
 ///   (no filled background "highlight" rectangle).
 /// - Thin 0.5 pt accent underline appears under the active tab.
 /// - Subtle scale / opacity transition on hover to feel alive.
-struct AccentToolbarLabel: View {
+@MainActor struct AccentToolbarLabel: View {
     let title: String
     let systemImage: String
     var isActive: Bool = false
@@ -533,7 +524,7 @@ struct AccentToolbarLabel: View {
     }
 }
 
-private struct EmptyInputNotice: View {
+@MainActor private struct EmptyInputNotice: View {
     private var axTrusted: Bool { AXIsProcessTrusted() }
 
     var body: some View {

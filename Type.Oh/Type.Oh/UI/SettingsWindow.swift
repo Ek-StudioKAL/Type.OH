@@ -18,9 +18,9 @@ enum SettingsTab: String, Codable, CaseIterable, Sendable {
     var systemImage: String {
         switch self {
         case .general: "gear"
-        case .providers: "brain.filled.head.profile"
+        case .providers: "brain.head.profile"
         case .presets: "paintbrush"
-        case .translation: "translate"
+        case .translation: "character.book.closed"
         case .models: "waveform"
         }
     }
@@ -50,8 +50,8 @@ enum SettingsTabRoute {
     }
 }
 
-struct SettingsWindow: View {
-    @Environment(SettingsStore.self) private var settings
+@MainActor struct SettingsWindow: View {
+    @EnvironmentObject private var settings: SettingsStore
     @State private var selectedTab: SettingsTab = .general
 
     var body: some View {
@@ -64,7 +64,6 @@ struct SettingsWindow: View {
         }
         .frame(width: 620, height: 680)
         .background(WindowDragBehaviorConfigurator())
-        .focusEffectDisabled()
         .onAppear {
             if let pendingTab = SettingsTabRoute.consumePendingTab() {
                 selectedTab = pendingTab
@@ -96,7 +95,7 @@ struct SettingsWindow: View {
     }
 }
 
-private struct WindowDragBehaviorConfigurator: NSViewRepresentable {
+@MainActor private struct WindowDragBehaviorConfigurator: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView(frame: .zero)
         DispatchQueue.main.async {
@@ -112,7 +111,7 @@ private struct WindowDragBehaviorConfigurator: NSViewRepresentable {
     }
 }
 
-private struct SettingsTabBar: View {
+@MainActor private struct SettingsTabBar: View {
     @Binding var selectedTab: SettingsTab
 
     var body: some View {
@@ -136,15 +135,14 @@ private struct SettingsTabBar: View {
 
 // MARK: - General
 
-private struct GeneralTab: View {
-    @Environment(SettingsStore.self) private var settings
+@MainActor private struct GeneralTab: View {
+    @EnvironmentObject private var settings: SettingsStore
     @State private var voiceHotkeyDraft = HotkeyConfig.defaultVoice
     @State private var editorHotkeyDraft = HotkeyConfig.defaultEditor
     @State private var scratchpadHotkeyDraft: HotkeyConfig? = nil
     @State private var hotkeyError: String?
 
     var body: some View {
-        @Bindable var settings = settings
         Form {
             Section("Hotkeys") {
                 HotkeyConfigurationEditor(
@@ -175,12 +173,12 @@ private struct GeneralTab: View {
             }
             Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
-                    .onChange(of: settings.launchAtLogin) { _, enabled in
+                    .onChange(of: settings.launchAtLogin) { enabled in
                         toggleLoginItem(enabled)
                         settings.save()
                     }
                 Toggle("Show in Dock", isOn: $settings.showInDock)
-                    .onChange(of: settings.showInDock) { _, show in
+                    .onChange(of: settings.showInDock) { show in
                         NSApp.setActivationPolicy(show ? .regular : .accessory)
                         settings.save()
                     }
@@ -236,8 +234,8 @@ private struct GeneralTab: View {
 
 // MARK: - Providers
 
-private struct ProvidersTab: View {
-    @Environment(SettingsStore.self) private var settings
+@MainActor private struct ProvidersTab: View {
+    @EnvironmentObject private var settings: SettingsStore
 
     /// Presence per provider — populated from `KeychainStore.hasKey`, which
     /// is a metadata-only query and does *not* trigger the keychain password
@@ -251,7 +249,6 @@ private struct ProvidersTab: View {
     @State private var saveError:       String?
 
     var body: some View {
-        @Bindable var settings = settings
         Form {
             Section {
                 Picker("Active Provider", selection: $settings.activeProvider) {
@@ -267,7 +264,7 @@ private struct ProvidersTab: View {
                         .tag(p)
                     }
                 }
-                .onChange(of: settings.activeProvider) { settings.save() }
+                .onChange(of: settings.activeProvider) { _ in settings.save() }
 
                 if settings.activeProvider.requiresAPIKey && keyPresent[settings.activeProvider] == false {
                     Label(
@@ -360,9 +357,9 @@ private struct ProvidersTab: View {
 // MARK: - Models
 
 
-private struct ModelsTab: View {
-    @Environment(SettingsStore.self) private var settings
-    @State private var manager = ModelManager.shared
+@MainActor private struct ModelsTab: View {
+    @EnvironmentObject private var settings: SettingsStore
+    @ObservedObject private var manager = ModelManager.shared
     @State private var ramMB: Double = ModelManager.processResidentMB
     @State private var ramTimer: Timer?
     @State private var showReloadPrompt = false
@@ -381,7 +378,6 @@ private struct ModelsTab: View {
     }
 
     var body: some View {
-        @Bindable var settings = settings
         Form {
             Section("Whisper Model Configuration") {
                 Picker("Active model", selection: $settings.whisperModel) {
@@ -389,7 +385,7 @@ private struct ModelsTab: View {
                         Text("\(m.displayName)  \(m.sizeDescription)").tag(m.id)
                     }
                 }
-                .onChange(of: settings.whisperModel) { _, newModel in
+                .onChange(of: settings.whisperModel) { newModel in
                     settings.save()
                     // If a different model is currently loaded, ask before
                     // unloading + reloading. Whisper reloads cost 1-5 s.
@@ -593,15 +589,14 @@ private struct ModelsTab: View {
 
 // MARK: - Presets
 
-private struct PresetsTab: View {
-    @Environment(SettingsStore.self) private var settings
+@MainActor private struct PresetsTab: View {
+    @EnvironmentObject private var settings: SettingsStore
     @State private var editingID: String?
     @State private var draftLabel  = ""
     @State private var draftEmoji  = "🎨"
     @State private var draftPrompt = ""
 
     var body: some View {
-        @Bindable var settings = settings
         Form {
             Section {
                 Text("Custom presets show up alongside the built-in styles in LazyPad's sidebar. Up to \(CustomStylePreset.maxCount) custom presets are supported.")
@@ -732,28 +727,34 @@ private struct PresetsTab: View {
 
 // MARK: - Translation
 
-private struct TranslationTab: View {
-    @Environment(SettingsStore.self) private var settings
+@MainActor private struct TranslationTab: View {
+    @EnvironmentObject private var settings: SettingsStore
 
     @State private var sourceLanguage: Locale.Language? = nil
     @State private var targetLanguage: Locale.Language  = Locale.Language(identifier: "en")
     @State private var hasLoadedFromSettings = false
 
     var body: some View {
-        @Bindable var settings = settings
         Form {
             Section("Translation Provider") {
                 Picker("Engine", selection: Binding(
-                    get: { settings.translationProvider ?? .nativeOS },
+                    get: { settings.translationProvider ?? .preferred },
                     set: { settings.translationProvider = $0; settings.save() }
                 )) {
-                    ForEach(TranslationProviderID.allCases, id: \.self) { provider in
+                    ForEach(TranslationProviderID.availableCases, id: \.self) { provider in
                         Text(provider.displayName).tag(provider)
                     }
                 }
                 .pickerStyle(.inline)
 
-                if let current = settings.translationProvider {
+                if !NativeTranslationSupport.isAvailable {
+                    Text("Native macOS translation needs macOS 15 or later, so it isn't offered on this Mac.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if let current = settings.translationProvider ?? Optional(.preferred) {
                     Text(current.detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -768,8 +769,8 @@ private struct TranslationTab: View {
                     compact: false,
                     availability: settings.translationProvider == .nativeOS ? .nativeOSOffline : .allLocaleLanguages
                 )
-                .onChange(of: sourceLanguage) { persist() }
-                .onChange(of: targetLanguage) { persist() }
+                .onChange(of: sourceLanguage) { _ in persist() }
+                .onChange(of: targetLanguage) { _ in persist() }
 
                 Text("ReType and LazyPad use these defaults — translate buttons run instantly without re-asking.")
                     .font(.caption)

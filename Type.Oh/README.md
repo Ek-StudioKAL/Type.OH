@@ -41,18 +41,26 @@ Type.OH is a native macOS writing and dictation utility for moving quickly betwe
 
 The defaults are:
 
-- `F13`: voice dictation.
-- `F14`: ReType selected-text editor.
-- `F15`: LazyPad.
+- `⌃⌥D`: voice dictation.
+- `⌃⌥R`: ReType selected-text editor.
+- `⌃⌥L`: LazyPad.
+
+(Settings files from older builds that still hold the previous F13/F14/F15
+defaults are migrated automatically.)
+
+The same actions are reachable from outside the app through the `typeoh://`
+URL scheme — `dictate`, `retype`, `lazypad`, `settings` — e.g.
+`open -g "typeoh://dictate"`. `touchbar/install.sh` turns those into Touch Bar
+Quick Actions.
 
 You can change or reset these in `Settings -> General`.
 
 ## Translation
 
-Type.OH supports three translation engines:
+Type.OH supports three translation engines (Settings → Translation):
 
-- Native macOS Translation: offline and fast, with limited languages.
-- Apple On-Device LLM: private local model when Apple Intelligence is available.
+- Google Translate (free, default): Google's public web endpoint, no key needed. Unofficial, so bursts can be rate-limited briefly.
+- Native macOS Translation: offline and fast, with limited languages (macOS 15+ only).
 - Cloud Provider: uses the currently selected Anthropic, OpenAI, or Gemini provider.
 
 ## Running Outside Xcode
@@ -82,6 +90,23 @@ If the app was downloaded, copied, or archived and macOS added quarantine attrib
 ```bash
 xattr -dr com.apple.quarantine /path/to/Type.Oh.app
 ```
+
+## Building on macOS 13 (Intel) without Xcode
+
+The Xcode project targets macOS 26 / Apple Silicon. For an Intel Mac on
+Ventura there is a SwiftPM build (`Package.swift` + `build-app.sh`) that needs
+only the Command Line Tools and a swift.org **Swift 5.10** toolchain installed
+per-user in `~/Library/Developer/Toolchains`:
+
+```bash
+./build-app.sh            # -> build/ventura/Type.Oh.app (ad-hoc signed)
+open build/ventura/Type.Oh.app
+```
+
+On that build the Apple on-device LLM (Apple Intelligence) and the native
+macOS translation engine are not available — rewrites and translation use the
+cloud provider you configure. WhisperKit is vendored under `Vendor/` (see
+`Vendor/README.md` for why and what was patched).
 
 ## Important Note
 

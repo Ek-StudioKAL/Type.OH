@@ -9,8 +9,8 @@ import SwiftUI
 /// this surface. Reference layout: `~/Type.OH/Splash_screen-ref/referance.png`.
 /// The hero logo currently uses the app icon; swap to the SVG assets in
 /// `Splash_screen-ref/` once they're added to Assets.xcassets.
-struct LaunchSplash: View {
-    @Bindable var bootstrap: LaunchBootstrap
+@MainActor struct LaunchSplash: View {
+    @ObservedObject var bootstrap: LaunchBootstrap
     let onDismiss: () -> Void
 
     var body: some View {
@@ -49,7 +49,7 @@ struct LaunchSplash: View {
             RoundedRectangle(cornerRadius: 20)
                 .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
         )
-        .onChange(of: bootstrap.isComplete) { _, done in
+        .onChange(of: bootstrap.isComplete) { done in
             guard done else { return }
             // Brief beat at 100% so the bar's completion is visible.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {

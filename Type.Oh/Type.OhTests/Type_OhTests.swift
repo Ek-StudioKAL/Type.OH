@@ -4,7 +4,6 @@ import Testing
 struct TypeOhCoreTests {
 
     @Test func providerRawValuesRemainStable() {
-        #expect(ProviderID.appleOnDevice.rawValue == "apple")
         #expect(ProviderID.anthropic.rawValue == "anthropic")
         #expect(ProviderID.openAI.rawValue == "openai")
         #expect(ProviderID.google.rawValue == "google")

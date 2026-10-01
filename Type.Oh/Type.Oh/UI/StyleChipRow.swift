@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct StyleChipRow: View {
+@MainActor struct StyleChipRow: View {
     @Binding var selected: StylePreset?
 
     var body: some View {
@@ -31,7 +31,7 @@ func styleSymbol(for preset: StylePreset) -> String {
     }
 }
 
-private struct ChipButton: View {
+@MainActor private struct ChipButton: View {
     let preset: StylePreset
     let isSelected: Bool
     let action: () -> Void

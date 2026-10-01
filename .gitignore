@@ -1,2 +1,6 @@
 /docs
 .DS_Store
+
+# SwiftPM build output (macOS 13 / Intel build, see Type.Oh/build-app.sh)
+.build/
+Type.Oh/build/ventura/

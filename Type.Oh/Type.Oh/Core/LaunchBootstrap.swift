@@ -2,7 +2,6 @@ import AppKit
 import ApplicationServices
 import AVFoundation
 import Foundation
-import Observation
 
 /// Drives the launch splash: runs a small sequence of warm-up tasks, reports
 /// progress, and signals completion. Each step writes the human-readable
@@ -11,12 +10,11 @@ import Observation
 /// Steps are intentionally read-only — none of them *requests* permissions
 /// (that's onboarding's job). The bootstrap just observes current state so
 /// the first hotkey press lands on warmed caches instead of cold modules.
-@Observable
 @MainActor
-final class LaunchBootstrap {
-    private(set) var progress: Double = 0.0
-    private(set) var step: String = "Starting…"
-    private(set) var isComplete: Bool = false
+final class LaunchBootstrap: ObservableObject {
+    @Published private(set) var progress: Double = 0.0
+    @Published private(set) var step: String = "Starting…"
+    @Published private(set) var isComplete: Bool = false
 
     private weak var settings: SettingsStore?
     private weak var whisperService: WhisperService?

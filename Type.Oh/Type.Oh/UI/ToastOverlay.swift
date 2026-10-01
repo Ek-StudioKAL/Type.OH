@@ -13,7 +13,7 @@ final class ToastOverlay {
         dismissTask?.cancel()
         panel?.close()
 
-        let hc = NSHostingController(rootView: ToastView(message: message))
+        let hc = NSHostingController(rootView: ToastView(message: message).typeOhAccent())
         hc.sizingOptions = .preferredContentSize
 
         let p = NSPanel(
@@ -51,7 +51,7 @@ final class ToastOverlay {
     }
 }
 
-private struct ToastView: View {
+@MainActor private struct ToastView: View {
     let message: String
 
     var body: some View {

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct DiffTextView: View {
+@MainActor struct DiffTextView: View {
     let original: String
     let result:   String
 
