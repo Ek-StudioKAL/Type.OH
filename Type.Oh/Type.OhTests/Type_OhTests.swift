@@ -4,6 +4,9 @@ import Testing
 struct TypeOhCoreTests {
 
     @Test func providerRawValuesRemainStable() {
+        #if canImport(FoundationModels)
+        #expect(ProviderID.appleOnDevice.rawValue == "apple")
+        #endif
         #expect(ProviderID.anthropic.rawValue == "anthropic")
         #expect(ProviderID.openAI.rawValue == "openai")
         #expect(ProviderID.google.rawValue == "google")

@@ -1,6 +1,9 @@
 import AppKit
 import ApplicationServices
 import AVFoundation
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 import SwiftUI
 
 @MainActor struct OnboardingWizard: View {
@@ -18,6 +21,9 @@ import SwiftUI
 
     enum Step: Int, CaseIterable {
         case welcome
+        #if canImport(FoundationModels)
+        case appleIntelligence
+        #endif
         case permissions
         case hotkeys
         case model
@@ -28,6 +34,9 @@ import SwiftUI
         var title: String {
             switch self {
             case .welcome:           "Welcome to Type.OH"
+            #if canImport(FoundationModels)
+            case .appleIntelligence: "Apple Intelligence"
+            #endif
             case .permissions:       "Permissions"
             case .hotkeys:           "Hotkeys"
             case .model:             "Voice Model"
@@ -63,6 +72,9 @@ import SwiftUI
                 Group {
                     switch step {
                     case .welcome:           WelcomeStep()
+                    #if canImport(FoundationModels)
+                    case .appleIntelligence: AppleIntelligenceStep()
+                    #endif
                     case .permissions:       PermissionsStep()
                     case .hotkeys:           HotkeysStep(
                         voiceHotkey: $voiceHotkeyDraft,
@@ -236,6 +248,75 @@ import SwiftUI
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
     }
 }
+
+#if canImport(FoundationModels)
+// MARK: - Apple Intelligence (FoundationModels builds only)
+
+@MainActor private struct AppleIntelligenceStep: View {
+    @State private var status: String = ""
+    @State private var available: Bool = false
+    @State private var detail: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Type.OH can use Apple Intelligence as its default on-device AI provider when this Mac and OS support it.")
+
+            HStack(spacing: 8) {
+                Image(systemName: available ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(available ? .green : .orange)
+                Text(status)
+                    .font(.body.weight(.medium))
+            }
+            .padding(.vertical, 4)
+
+            if !available {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if #available(macOS 26.0, *) {
+                    Button("Open Apple Intelligence Settings") {
+                        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.appleintelligence") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                Text("Type.OH will still work on this Mac with an external AI provider such as Anthropic, OpenAI, or Google. You can choose that in the next steps.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+            } else {
+                Text("You're ready to use the on-device model. No cloud round-trips, no API key required.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onAppear { refresh() }
+    }
+
+    private func refresh() {
+        if #available(macOS 26.0, *) {
+            let availability = SystemLanguageModel.default.availability
+            if case .available = availability {
+                available = true
+                status = "Apple Intelligence is available"
+                detail = ""
+            } else {
+                available = false
+                status = "Apple Intelligence is unavailable on this Mac"
+                detail = "Apple Intelligence requires supported hardware, a supported macOS version, and must be enabled in System Settings → Apple Intelligence & Siri."
+            }
+        } else {
+            available = false
+            status = "Apple Intelligence is not supported on this macOS version"
+            detail = "This Mac is running an earlier macOS release. Type.OH can still use an external AI provider instead."
+        }
+    }
+}
+#endif
 
 // MARK: - Step 2: Permissions
 

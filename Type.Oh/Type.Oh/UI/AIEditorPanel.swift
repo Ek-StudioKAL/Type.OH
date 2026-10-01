@@ -58,6 +58,7 @@ import SwiftUI
         .padding(14)
         .frame(minWidth: 480, idealWidth: 560, maxWidth: 900)
         .background(NativeTranslationDriverView())
+        .typeOhFocusEffectDisabled()
         .onAppear { loadTranslationSettingsIfNeeded() }
     }
 

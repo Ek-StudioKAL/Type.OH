@@ -69,6 +69,9 @@ func cleanTextAIOutput(_ output: String) -> String {
 enum ProviderRegistry {
     static func provider(for id: ProviderID) -> any TextAIProvider {
         switch id {
+        #if canImport(FoundationModels)
+        case .appleOnDevice: AppleOnDeviceProvider()
+        #endif
         case .anthropic:     AnthropicProvider(apiKey: KeychainStore.load(for: .anthropic) ?? "")
         case .openAI:        OpenAIProvider(apiKey:    KeychainStore.load(for: .openAI)    ?? "")
         case .google:        GoogleProvider(apiKey:    KeychainStore.load(for: .google)    ?? "")

@@ -64,6 +64,7 @@ enum SettingsTabRoute {
         }
         .frame(width: 620, height: 680)
         .background(WindowDragBehaviorConfigurator())
+        .typeOhFocusEffectDisabled()
         .onAppear {
             if let pendingTab = SettingsTabRoute.consumePendingTab() {
                 selectedTab = pendingTab

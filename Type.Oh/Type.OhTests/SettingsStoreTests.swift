@@ -24,8 +24,8 @@ struct SettingsStoreTests {
         #expect(store.whisperOutputLanguage == nil)
     }
 
-    @Test func defaultProviderIsAnthropic() {
-        #expect(freshStore().activeProvider == .anthropic)
+    @Test func defaultProviderIsFallback() {
+        #expect(freshStore().activeProvider == .fallback)
     }
 
     @Test func defaultShowInDockIsTrue() {
@@ -71,8 +71,21 @@ struct SettingsStoreTests {
 
     // MARK: - ProviderID
 
-    @Test func removedAppleProviderDecodesAsFallback() throws {
+    #if canImport(FoundationModels)
+    @Test func appleOnDeviceIsFallbackAndRequiresNoKey() {
+        #expect(ProviderID.fallback == .appleOnDevice)
+        #expect(ProviderID.appleOnDevice.requiresAPIKey == false)
+    }
+    #else
+    @Test func appleProviderDecodesAsFallbackWithoutFoundationModels() throws {
         let decoded = try JSONDecoder().decode(ProviderID.self, from: Data("\"apple\"".utf8))
+        #expect(decoded == .fallback)
+        #expect(ProviderID.fallback == .anthropic)
+    }
+    #endif
+
+    @Test func unknownProviderDecodesAsFallback() throws {
+        let decoded = try JSONDecoder().decode(ProviderID.self, from: Data("\"mistral\"".utf8))
         #expect(decoded == .fallback)
     }
 

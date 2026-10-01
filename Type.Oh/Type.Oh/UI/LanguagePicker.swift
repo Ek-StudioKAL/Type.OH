@@ -188,6 +188,7 @@ enum LanguagePickerAvailability: Equatable {
             )
         }
         .buttonStyle(.plain)
+        .typeOhFocusEffectDisabled()
         .popover(isPresented: $isShowingPopover, arrowEdge: .bottom) {
             popoverContent
                 .frame(width: 280, height: 360)

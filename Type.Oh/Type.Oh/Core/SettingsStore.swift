@@ -31,30 +31,47 @@ struct CustomStylePreset: Codable, Identifiable, Equatable, Sendable {
     static let maxCount = 8
 }
 
-/// Cloud text-AI providers. The Apple on-device provider (FoundationModels /
-/// Apple Intelligence) was removed: it needs macOS 26 on Apple Silicon and this
-/// build targets macOS 13 on Intel.
+/// Text-AI providers. The Apple on-device provider (FoundationModels / Apple
+/// Intelligence) only exists when the SDK has FoundationModels — the Xcode
+/// build for macOS 26 on Apple Silicon. The macOS 13 / Intel SwiftPM build
+/// has the cloud providers only.
 enum ProviderID: String, Codable, CaseIterable, Sendable {
+    #if canImport(FoundationModels)
+    case appleOnDevice = "apple"
+    #endif
     case anthropic     = "anthropic"
     case openAI        = "openai"
     case google        = "google"
 
-    /// Provider used when settings are fresh or reference a provider that no
-    /// longer exists (e.g. "apple" written by an older build).
-    static let fallback: ProviderID = .anthropic
+    /// Provider used when settings are fresh or reference a provider this
+    /// build doesn't have (e.g. "apple" read by the Intel build).
+    static var fallback: ProviderID {
+        #if canImport(FoundationModels)
+        if #available(macOS 26.0, *) { return .appleOnDevice }
+        #endif
+        return .anthropic
+    }
 
     var displayName: String {
         switch self {
+        #if canImport(FoundationModels)
+        case .appleOnDevice: "Apple (On-Device)"
+        #endif
         case .anthropic:     "Anthropic Claude"
         case .openAI:        "OpenAI GPT"
         case .google:        "Google Gemini"
         }
     }
 
-    var requiresAPIKey: Bool { true }
+    var requiresAPIKey: Bool {
+        #if canImport(FoundationModels)
+        if self == .appleOnDevice { return false }
+        #endif
+        return true
+    }
 
-    /// Tolerant decoding so a settings.json written by a build that still had
-    /// the Apple provider doesn't invalidate every other setting.
+    /// Tolerant decoding so a settings.json written by a build with a
+    /// different provider list doesn't invalidate every other setting.
     init(from decoder: Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
         self = ProviderID(rawValue: raw) ?? .fallback

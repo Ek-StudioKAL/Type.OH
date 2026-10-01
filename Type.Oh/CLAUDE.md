@@ -15,7 +15,7 @@ Everything runs locally by default (WhisperKit on Neural Engine, Apple Foundatio
 
 ## Requirements
 
-- **macOS 26 Tahoe+**, **Apple Silicon** for the Xcode project (Apple Intelligence was removed from the code; see "macOS 13 / Intel build" below for the Ventura path)
+- **macOS 26 Tahoe+**, **Apple Silicon**, **Apple Intelligence enabled** (for the on-device provider) for the Xcode project; see "macOS 13 / Intel build" below for the Ventura path
 - **Xcode 17+**
 - Swift Package: `https://github.com/argmaxinc/WhisperKit`
 
@@ -37,7 +37,7 @@ The app has `LSUIElement = YES` — no Dock icon, lives only in the menu bar.
 Single app target. Key components by folder:
 
 ### `Core/`
-- `SettingsStore.swift` — `@Observable`, persists to `~/Library/Application Support/Type.OH/settings.json`
+- `SettingsStore.swift` — `ObservableObject`, persists to `~/Library/Application Support/Type.OH/settings.json`
 - `KeychainStore.swift` — API key storage via `Security` framework (`com.typeoh.<provider>` / `apiKey`)
 - `HotkeyManager.swift` — Carbon `RegisterEventHotKey` wrapper (only reliable global hotkey API on macOS)
 - `FocusCapture.swift` — snapshots `NSWorkspace.frontmostApplication` *before* any UI opens (critical: must be captured before panels steal focus)
@@ -52,7 +52,8 @@ Single app target. Key components by folder:
 - `SelectionReader.swift` — reads selected text via AX (`kAXSelectedTextAttribute`); fallback: copy-via-`⌘C`
 - `TranslationService.swift` — Apple `TranslationSession` (local, free)
 - `TextAI/TextAIProvider.swift` — protocol `improve(text:)` / `applyStyle(text:style:)` / `emojify(text:)` + `ProviderID` enum + `ProviderRegistry`
-- `TextAI/AppleOnDevice.swift` — **default provider**, uses `FoundationModels` (`LanguageModelSession`)
+- `TextAI/AppleOnDevice.swift` — **default provider** where available, uses `FoundationModels` (`LanguageModelSession`); compiled only under `#if canImport(FoundationModels)`
+- `GoogleTranslateService.swift` — free Google Translate web endpoint, the default translation engine
 - `TextAI/AnthropicProvider.swift` — Claude Sonnet 4.6 / Haiku 4.5
 - `TextAI/OpenAIProvider.swift` — GPT-4o / 4o-mini
 - `TextAI/GoogleProvider.swift` — Gemini 1.5/2.0 Flash
@@ -85,14 +86,20 @@ toolchain and the Command Line Tools SDK (macOS 13.3). WhisperKit 0.10.1 and
 swift-transformers 0.1.8 are vendored under `Vendor/` (patched; see
 `Vendor/README.md`). On this build:
 
-- No `FoundationModels` / Apple on-device provider — `ProviderID` has only the
-  cloud providers; `ProviderID.fallback` (Anthropic) is the default.
+- No `FoundationModels` / Apple on-device provider. Every reference to it
+  (`ProviderID.appleOnDevice`, `AppleOnDevice.swift`, the onboarding step,
+  LazyPad's provider rows) sits under `#if canImport(FoundationModels)`, so the
+  Xcode build keeps it and this build drops it. `ProviderID.fallback` is
+  Apple on-device where compiled in (macOS 26), Anthropic otherwise.
 - The `Translation` framework is compiled only when the SDK has it
   (`#if canImport(Translation)`); `NativeTranslationSupport.isAvailable`
   gates the native engine at runtime.
 - State objects are `ObservableObject` (`@Published`), not `@Observable`;
   views use `@EnvironmentObject` / `@ObservedObject`. Settings opens via
-  `SettingsWindowOpener` (no `openSettings` environment action on macOS 13).
+  `SettingsWindowOpener`: on macOS 14+ it calls the SwiftUI `openSettings`
+  action registered by `MenuBarIconLabel`; on macOS 13 (no `openSettings`) it
+  sends `showSettingsWindow:`. APIs newer than macOS 13 go behind
+  `#available` (e.g. `typeOhFocusEffectDisabled()`).
 - Every SwiftUI view struct is marked `@MainActor` (implied by newer SDKs).
 - The tests use Swift Testing, which the 5.10 toolchain lacks; they can't run
   on the Intel machine.

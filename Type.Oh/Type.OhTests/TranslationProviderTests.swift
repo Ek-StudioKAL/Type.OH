@@ -43,6 +43,11 @@ struct TranslationProviderTests {
         #expect(TranslationProviderID.preferred == .googleTranslate)
     }
 
+    @Test func removedAppleLLMEngineDecodesAsGoogleTranslate() throws {
+        let decoded = try JSONDecoder().decode(TranslationProviderID.self, from: Data("\"localLLM\"".utf8))
+        #expect(decoded == .googleTranslate)
+    }
+
     @Test func googleTranslateParsesSentencesAndDetectedLanguage() throws {
         let json = #"[[["שלום עולם. ","Hello world. ",null,null,3],["מה שלומך?","How are you?",null,null,3]],null,"en"]"#
         let result = try GoogleTranslateService.parse(Data(json.utf8))

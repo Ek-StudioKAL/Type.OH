@@ -84,6 +84,7 @@ private enum ScratchpadAction {
         .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(NativeTranslationDriverView())
+        .typeOhFocusEffectDisabled()
         .onChange(of: text) { newText in
             store.scheduleSave(newText)
         }
@@ -676,6 +677,9 @@ private enum ScratchpadAction {
 
     private func providerSymbol(for provider: ProviderID) -> String {
         switch provider {
+        #if canImport(FoundationModels)
+        case .appleOnDevice: "apple.logo"
+        #endif
         case .anthropic: "text.quote"
         case .openAI: "bubble.left.and.bubble.right"
         case .google: "g.circle"
@@ -684,6 +688,9 @@ private enum ScratchpadAction {
 
     private var currentProviderToolbarTitle: String {
         switch settings.activeProvider {
+        #if canImport(FoundationModels)
+        case .appleOnDevice: "Apple"
+        #endif
         case .anthropic: "Claude"
         case .openAI: "ChatGPT"
         case .google: "Google"
@@ -692,6 +699,9 @@ private enum ScratchpadAction {
 
     private func providerMenuTitle(for provider: ProviderID) -> String {
         switch provider {
+        #if canImport(FoundationModels)
+        case .appleOnDevice: "Apple (On-Device)"
+        #endif
         case .anthropic: "Anthropic Claude"
         case .openAI: "OpenAI ChatGPT"
         case .google: "Google Gemini"
@@ -834,6 +844,12 @@ private enum ScratchpadAction {
     @ViewBuilder
     private func providerSidebarIcon(for provider: ProviderID) -> some View {
         switch provider {
+        #if canImport(FoundationModels)
+        case .appleOnDevice:
+            Image(systemName: "apple.intelligence")
+                .font(.system(size: 15, weight: .regular))
+                .symbolRenderingMode(.hierarchical)
+        #endif
         case .anthropic:
             BrandImage(name: "Claude")
         case .openAI:

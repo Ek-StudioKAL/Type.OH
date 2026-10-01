@@ -94,6 +94,7 @@ enum DictationHUDPhase: Equatable {
                 .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
         )
         .background(NativeTranslationDriverView())
+        .typeOhFocusEffectDisabled()
         .onAppear { pulsing = true }
         .onReceive(clock) { _ in elapsed += 1 }
     }

@@ -17,7 +17,7 @@ struct TypeOhApp: App {
             SettingsWindow()
                 .environmentObject(appDelegate.settingsStore)
                 .typeOhAccent()
-                
+                .typeOhFocusEffectDisabled()
         }
     }
 }
@@ -31,6 +31,11 @@ struct TypeOhApp: App {
             .scaledToFit()
             .frame(width: 18, height: 18)
             .help("Type.OH")
+            .background {
+                if #available(macOS 14.0, *) {
+                    OpenSettingsActionBridge()
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("typeoh.openSettings"))) { _ in
                 openSettingsWindow()
             }
@@ -56,5 +61,20 @@ struct TypeOhApp: App {
 
     private func openSettingsWindow() {
         SettingsWindowOpener.open()
+    }
+}
+
+/// Hands SwiftUI's `openSettings` action to `SettingsWindowOpener`, so AppKit
+/// code (URL scheme, panels, notifications) can open Settings on macOS 14+.
+@available(macOS 14.0, *)
+@MainActor private struct OpenSettingsActionBridge: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Color.clear
+            .onAppear {
+                let action = openSettings
+                SettingsWindowOpener.openSettingsAction = { action() }
+            }
     }
 }
