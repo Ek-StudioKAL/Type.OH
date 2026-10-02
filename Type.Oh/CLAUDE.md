@@ -8,8 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Type.OH** (also called iLazyKey) is a native macOS menu-bar app with two flows triggered by global hotkeys:
 
-1. **Voice → Text** (`⌃⌥D`): Record speech → transcribe locally via WhisperKit → paste at cursor.
-2. **AI Editor** (`⌃⌥R`, LazyPad `⌃⌥L`; also `typeoh://dictate|retype|lazypad|settings` URLs): Select text in any app → floating panel → Translate / Style / Fix → replace in place.
+1. **Voice → Text** (`F13`): Record speech → transcribe locally via WhisperKit → paste at cursor.
+2. **AI Editor** (`F14`, LazyPad `F15`; also `typeoh://dictate|retype|lazypad|settings` URLs): Select text in any app → floating panel → Translate / Style / Fix → replace in place.
 
 Everything runs locally by default (WhisperKit on Neural Engine, Apple Foundation Models, Apple Translation). Optionally, users bring their own Anthropic / OpenAI / Google API key stored in the macOS Keychain.
 

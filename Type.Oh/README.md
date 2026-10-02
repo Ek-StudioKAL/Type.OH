@@ -41,12 +41,13 @@ Type.OH is a native macOS writing and dictation utility for moving quickly betwe
 
 The defaults are:
 
-- `⌃⌥D`: voice dictation.
-- `⌃⌥R`: ReType selected-text editor.
-- `⌃⌥L`: LazyPad.
+- `F13`: voice dictation.
+- `F14`: ReType selected-text editor.
+- `F15`: LazyPad.
 
-(Settings files from older builds that still hold the previous F13/F14/F15
-defaults are migrated automatically.)
+Any function key (F1–F20) works on its own; other shortcuts need ⌘ / ⌃ / ⌥ / ⇧.
+Keyboards without F13–F15 (e.g. a MacBook's built-in keyboard) need a custom
+shortcut — hold fn to record F1–F12.
 
 The same actions are reachable from outside the app through the `typeoh://`
 URL scheme — `dictate`, `retype`, `lazypad`, `settings` — e.g.

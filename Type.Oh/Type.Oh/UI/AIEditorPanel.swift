@@ -56,7 +56,7 @@ import SwiftUI
             actionBar
         }
         .padding(14)
-        .frame(minWidth: 480, idealWidth: 560, maxWidth: 900)
+        .frame(minWidth: 480, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(NativeTranslationDriverView())
         .typeOhFocusEffectDisabled()
         .onAppear { loadTranslationSettingsIfNeeded() }
@@ -174,7 +174,7 @@ import SwiftUI
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
             )
-            .frame(minHeight: 60, maxHeight: 160)
+            .frame(minHeight: 60, maxHeight: .infinity)
         }
     }
 
@@ -208,7 +208,7 @@ import SwiftUI
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
             )
-            .frame(minHeight: 60, maxHeight: 200)
+            .frame(minHeight: 60, maxHeight: .infinity)
         }
     }
 

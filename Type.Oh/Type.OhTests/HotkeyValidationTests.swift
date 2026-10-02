@@ -38,7 +38,16 @@ struct HotkeyValidationTests {
             scratchpad: .defaultScratchpad
         )
 
-        #expect(error == "Voice recording needs at least one modifier key (or an F13–F19 key).")
+        #expect(error == "Voice recording needs at least one modifier key (or a function key).")
+    }
+
+    @Test func functionKeysWorkWithoutModifiers() {
+        // F5 (96) alone, F13 (105) alone, F20 (90) alone
+        #expect(validateHotkeys(
+            voice: HotkeyConfig(keyCode: 96, modifiers: 0),
+            editor: HotkeyConfig(keyCode: 105, modifiers: 0),
+            scratchpad: HotkeyConfig(keyCode: 90, modifiers: 0)
+        ) == nil)
     }
 
     @Test func duplicateHotkeysAreRejected() {

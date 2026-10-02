@@ -11,12 +11,11 @@ extension HotkeyConfig {
         modifiers != 0
     }
 
-    /// Extended function keys (F13–F19) are safe to use without modifiers —
-    /// almost no app or system shortcut claims them.
-    var isStandaloneSafeKey: Bool {
-        // F13 = 105, F14 = 107, F15 = 113, F16 = 106, F17 = 64, F18 = 79, F19 = 80
-        let safeStandaloneKeys: Set<UInt32> = [105, 106, 107, 113, 64, 79, 80]
-        return safeStandaloneKeys.contains(keyCode)
+    /// Function keys (F1–F20) may be used without modifiers. F13–F19 are the
+    /// safest — almost no app or system shortcut claims them; a bare F1–F12
+    /// hotkey takes that key away from every other app.
+    var isFunctionKey: Bool {
+        functionKeyCodes.contains(keyCode)
     }
 }
 
@@ -25,8 +24,8 @@ func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: Ho
     guard let editor else { return "AI Editor needs a hotkey." }
 
     func needsModifierError(_ name: String, _ hk: HotkeyConfig) -> String? {
-        guard !hk.hasModifiers && !hk.isStandaloneSafeKey else { return nil }
-        return "\(name) needs at least one modifier key (or an F13–F19 key)."
+        guard !hk.hasModifiers && !hk.isFunctionKey else { return nil }
+        return "\(name) needs at least one modifier key (or a function key)."
     }
     if let err = needsModifierError("Voice recording", voice) { return err }
     if let err = needsModifierError("AI Editor", editor)     { return err }
@@ -84,7 +83,7 @@ func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: Ho
                 onClear: { scratchpadHotkey = .defaultScratchpad }
             )
 
-            Text("Defaults are \(HotkeyConfig.defaultVoice.displayString) for Voice, \(HotkeyConfig.defaultEditor.displayString) for AI Editor, and \(HotkeyConfig.defaultScratchpad.displayString) for LazyPad. Shortcuts need ⌘ / ⌃ / ⌥ / ⇧, except F13–F19 on extended keyboards.")
+            Text("Defaults are \(HotkeyConfig.defaultVoice.displayString) for Voice, \(HotkeyConfig.defaultEditor.displayString) for AI Editor, and \(HotkeyConfig.defaultScratchpad.displayString) for LazyPad. Shortcuts need ⌘ / ⌃ / ⌥ / ⇧, except function keys (F1–F20), which work alone. On a MacBook keyboard, hold fn while pressing F1–F12.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -213,6 +212,12 @@ final class HotkeyRecorderButton: NSButton {
         }
     }
 
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        // Closing the window mid-recording must still resume the global hotkeys.
+        if newWindow == nil { stopRecording() }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
     @objc
     private func toggleRecording() {
         if isRecording {
@@ -225,6 +230,9 @@ final class HotkeyRecorderButton: NSButton {
     private func beginRecording() {
         guard !isRecording else { return }
         isRecording = true
+        // The app's own global hotkeys would swallow their keys (e.g. F13
+        // starting dictation) before the recorder sees them.
+        HotkeyManager.shared.suspend()
         window?.makeFirstResponder(self)
         installMonitor()
         updateDisplay()
@@ -233,6 +241,7 @@ final class HotkeyRecorderButton: NSButton {
     private func stopRecording() {
         guard isRecording else { return }
         isRecording = false
+        HotkeyManager.shared.resume()
         removeMonitor()
         updateDisplay()
         // Give focus back to the window so later key presses don't land here.
@@ -334,9 +343,15 @@ private func makeHotkey(from event: NSEvent) -> HotkeyConfig? {
         .intersection([.command, .option, .control, .shift])
     let modifiers = carbonModifiers(from: relevantFlags)
     let hotkey = HotkeyConfig(keyCode: UInt32(event.keyCode), modifiers: modifiers)
-    guard modifiers != 0 || hotkey.isStandaloneSafeKey else { return nil }
+    guard modifiers != 0 || hotkey.isFunctionKey else { return nil }
     return hotkey
 }
+
+/// Carbon key codes of F1–F20.
+private let functionKeyCodes: Set<UInt32> = [
+    122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111, // F1–F12
+    105, 107, 113, 106, 64, 79, 80, 90,                     // F13–F20
+]
 
 private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
     var modifiers: UInt32 = 0
@@ -413,8 +428,12 @@ private func keySymbol(for keyCode: UInt32) -> String {
     case 49: "Space"
     case 51: "⌫"
     case 53: "⎋"
+    case 64: "F17"
     case 71: "⌧"
     case 76: "↩"
+    case 79: "F18"
+    case 80: "F19"
+    case 90: "F20"
     case 96: "F5"
     case 97: "F6"
     case 98: "F7"

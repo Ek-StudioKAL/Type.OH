@@ -17,7 +17,7 @@ in frontmost, so focus capture and paste-back behave exactly like the hotkey.
 
 Notes
 - Quick Actions are listed by name; tap "Quick Actions" then "Type.OH Dictate".
-  Tap it again while recording to stop and transcribe (same toggle as ⌃⌥D).
+  Tap it again while recording to stop and transcribe (same toggle as the dictation hotkey).
 - System Settings → Extensions → Touch Bar Quick Actions controls which ones
   appear; System Settings → Keyboard → Customize Control Strip places the
   button.

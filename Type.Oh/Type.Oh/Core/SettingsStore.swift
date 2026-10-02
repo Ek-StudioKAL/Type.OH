@@ -5,19 +5,11 @@ struct HotkeyConfig: Codable, Equatable, Sendable {
     var keyCode: UInt32
     var modifiers: UInt32
 
-    /// ⌃⌥ + letter: exists on every MacBook keyboard (no F13–F15 there),
-    /// unused by macOS defaults, and mnemonic — D(ictate), R(eType), L(azyPad).
-    static let controlOption: UInt32 = 0x1000 | 0x0800 // Carbon controlKey | optionKey
-    static let defaultVoice      = HotkeyConfig(keyCode: 2,  modifiers: controlOption) // ⌃⌥D
-    static let defaultEditor     = HotkeyConfig(keyCode: 15, modifiers: controlOption) // ⌃⌥R
-    static let defaultScratchpad = HotkeyConfig(keyCode: 37, modifiers: controlOption) // ⌃⌥L
-
-    /// Defaults of earlier builds (extended F-keys, external keyboards only).
-    /// A settings file that still holds exactly these is migrated to the new
-    /// defaults on load; anything the user chose themselves is kept.
-    static let legacyVoice       = HotkeyConfig(keyCode: 105, modifiers: 0) // F13
-    static let legacyEditor      = HotkeyConfig(keyCode: 107, modifiers: 0) // F14
-    static let legacyScratchpad  = HotkeyConfig(keyCode: 113, modifiers: 0) // F15
+    // Extended F-keys F13 (105), F14 (107), F15 (113) make great global
+    // shortcuts — almost no app uses them and they're chord-free.
+    static let defaultVoice      = HotkeyConfig(keyCode: 105, modifiers: 0) // F13
+    static let defaultEditor     = HotkeyConfig(keyCode: 107, modifiers: 0) // F14
+    static let defaultScratchpad = HotkeyConfig(keyCode: 113, modifiers: 0) // F15
 }
 
 struct CustomStylePreset: Codable, Identifiable, Equatable, Sendable {
@@ -174,18 +166,6 @@ final class SettingsStore: ObservableObject {
         guard let data = try? Data(contentsOf: fileURL),
               let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
         snap.apply(to: self)
-        if migrateLegacyHotkeys() { save() }
-    }
-
-    /// Replace the old F13/F14/F15 defaults with the MacBook-friendly chords.
-    /// Returns true when anything changed.
-    @discardableResult
-    func migrateLegacyHotkeys() -> Bool {
-        var changed = false
-        if voiceHotkey == .legacyVoice { voiceHotkey = .defaultVoice; changed = true }
-        if editorHotkey == .legacyEditor { editorHotkey = .defaultEditor; changed = true }
-        if scratchpadHotkey == .legacyScratchpad { scratchpadHotkey = .defaultScratchpad; changed = true }
-        return changed
     }
 }
 

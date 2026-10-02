@@ -423,6 +423,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func showEditorPanel(with text: String, sticky: Bool = false) {
+        // Free the frame autosave name for the replacement panel below.
+        editorPanel?.setFrameAutosaveName("")
         editorPanel?.close()
 
         let content = AIEditorPanel(
@@ -443,22 +445,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         .environmentObject(settingsStore)
 
+        // The user sizes the window (sizingOptions = []: SwiftUI content changes
+        // don't resize it); the Input/Result cards stretch to fill it. Size and
+        // position persist across launches under the autosave name.
         let hc = NSHostingController(rootView: content.typeOhAccent())
         hc.sizingOptions = []
         let panel = makePanel(titled: true)
         panel.title = "ReType • AI Editor"
         panel.contentViewController = hc
-        let fixedSize = CGSize(width: 560, height: 300)
-        panel.styleMask.remove(.resizable)
-        panel.setContentSize(fixedSize)
-        panel.contentMinSize = fixedSize
-        panel.contentMaxSize = fixedSize
-        panel.minSize = panel.frameRect(forContentRect: NSRect(origin: .zero, size: fixedSize)).size
-        panel.maxSize = panel.minSize
-        panel.center()
+        panel.contentMinSize = CGSize(width: 480, height: 340)
+        panel.setContentSize(CGSize(width: 600, height: 440))
+        if !panel.setFrameUsingName(Self.editorPanelAutosaveName) {
+            panel.center()
+        }
+        panel.setFrameAutosaveName(Self.editorPanelAutosaveName)
         bringPanelFront(panel)
         editorPanel = panel
     }
+
+    private static let editorPanelAutosaveName = "TypeOhReTypeEditorPanel"
 
     // MARK: - About panel
 

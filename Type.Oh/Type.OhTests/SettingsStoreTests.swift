@@ -36,37 +36,39 @@ struct SettingsStoreTests {
         #expect(freshStore().hasCompletedOnboarding == false)
     }
 
-    @Test func defaultStoreScratchpadHotkeyIsDefault() {
+    @Test func defaultStoreScratchpadHotkeyIsF15() {
         #expect(freshStore().scratchpadHotkey == .defaultScratchpad)
     }
 
     // MARK: - Hotkey defaults
 
-    @Test func defaultVoiceHotkeyIsControlOptionD() {
-        #expect(HotkeyConfig.defaultVoice.keyCode == 2)
-        #expect(HotkeyConfig.defaultVoice.modifiers == HotkeyConfig.controlOption)
+    @Test func defaultVoiceHotkeyIsF13() {
+        #expect(HotkeyConfig.defaultVoice.keyCode == 105)
+        #expect(HotkeyConfig.defaultVoice.modifiers == 0)
     }
 
-    @Test func defaultEditorHotkeyIsControlOptionR() {
-        #expect(HotkeyConfig.defaultEditor.keyCode == 15)
-        #expect(HotkeyConfig.defaultEditor.modifiers == HotkeyConfig.controlOption)
+    @Test func defaultEditorHotkeyIsF14() {
+        #expect(HotkeyConfig.defaultEditor.keyCode == 107)
+        #expect(HotkeyConfig.defaultEditor.modifiers == 0)
     }
 
-    @Test func defaultScratchpadHotkeyIsControlOptionL() {
-        #expect(HotkeyConfig.defaultScratchpad.keyCode == 37)
-        #expect(HotkeyConfig.defaultScratchpad.modifiers == HotkeyConfig.controlOption)
+    @Test func defaultScratchpadHotkeyIsF15() {
+        #expect(HotkeyConfig.defaultScratchpad.keyCode == 113)
+        #expect(HotkeyConfig.defaultScratchpad.modifiers == 0)
     }
 
-    @Test func legacyFKeyDefaultsMigrateButCustomHotkeysStay() {
-        let store = freshStore()
-        store.voiceHotkey = .legacyVoice
-        store.editorHotkey = HotkeyConfig(keyCode: 0, modifiers: HotkeyConfig.controlOption) // custom ⌃⌥A
-        store.scratchpadHotkey = .legacyScratchpad
-        #expect(store.migrateLegacyHotkeys())
-        #expect(store.voiceHotkey == .defaultVoice)
-        #expect(store.editorHotkey.keyCode == 0)
-        #expect(store.scratchpadHotkey == .defaultScratchpad)
-        #expect(store.migrateLegacyHotkeys() == false)
+    @Test func savedHotkeysReloadUnchanged() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("typeoh-test-\(UUID().uuidString).json")
+        let store = SettingsStore(settingsURL: url)
+        let controlOptionD = HotkeyConfig(keyCode: 2, modifiers: 0x1000 | 0x0800)
+        store.voiceHotkey = controlOptionD
+        store.save()
+
+        let reloaded = SettingsStore(settingsURL: url)
+        #expect(reloaded.voiceHotkey == controlOptionD)
+        #expect(reloaded.editorHotkey == .defaultEditor)
+        #expect(reloaded.scratchpadHotkey == .defaultScratchpad)
     }
 
     // MARK: - ProviderID
