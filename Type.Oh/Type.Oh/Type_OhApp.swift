@@ -31,11 +31,7 @@ struct TypeOhApp: App {
             .scaledToFit()
             .frame(width: 18, height: 18)
             .help("Type.OH")
-            .background {
-                if #available(macOS 14.0, *) {
-                    OpenSettingsActionBridge()
-                }
-            }
+            .background(OpenSettingsActionBridge())
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("typeoh.openSettings"))) { _ in
                 openSettingsWindow()
             }
@@ -66,8 +62,25 @@ struct TypeOhApp: App {
 
 /// Hands SwiftUI's `openSettings` action to `SettingsWindowOpener`, so AppKit
 /// code (URL scheme, panels, notifications) can open Settings on macOS 14+.
-@available(macOS 14.0, *)
+/// The macOS 13.3 SDK has no `openSettings` (`TYPEOH_MACOS13_SDK`, see
+/// Package.swift); there `SettingsWindowOpener` uses `showSettingsWindow:`.
 @MainActor private struct OpenSettingsActionBridge: View {
+    var body: some View {
+        #if TYPEOH_MACOS13_SDK
+        Color.clear
+        #else
+        if #available(macOS 14.0, *) {
+            OpenSettingsActionRegistrar()
+        } else {
+            Color.clear
+        }
+        #endif
+    }
+}
+
+#if !TYPEOH_MACOS13_SDK
+@available(macOS 14.0, *)
+@MainActor private struct OpenSettingsActionRegistrar: View {
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -78,3 +91,4 @@ struct TypeOhApp: App {
             }
     }
 }
+#endif

@@ -6,6 +6,12 @@
 // produce Type.Oh.app from this manifest.
 import PackageDescription
 
+// This manifest builds against the Command Line Tools' macOS 13.3 SDK, which
+// lacks APIs that `#available` can't hide (e.g. SwiftUI's `openSettings`,
+// `focusEffectDisabled`). Code that needs a newer SDK sits under
+// `#if !TYPEOH_MACOS13_SDK`; the Xcode build never defines it.
+let macOS13SDK: [SwiftSetting] = [.define("TYPEOH_MACOS13_SDK")]
+
 let package = Package(
     name: "Type.Oh",
     platforms: [.macOS(.v13)],
@@ -31,12 +37,14 @@ let package = Package(
                 "Assets.xcassets",
                 "type-oh.icon",
                 "Type.Oh.entitlements",
-            ]
+            ],
+            swiftSettings: macOS13SDK
         ),
         .testTarget(
             name: "Type_OhTests",
             dependencies: ["Type_Oh"],
-            path: "Type.OhTests"
+            path: "Type.OhTests",
+            swiftSettings: macOS13SDK
         ),
     ]
 )

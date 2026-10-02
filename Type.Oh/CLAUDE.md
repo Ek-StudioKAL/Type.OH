@@ -98,8 +98,12 @@ swift-transformers 0.1.8 are vendored under `Vendor/` (patched; see
   views use `@EnvironmentObject` / `@ObservedObject`. Settings opens via
   `SettingsWindowOpener`: on macOS 14+ it calls the SwiftUI `openSettings`
   action registered by `MenuBarIconLabel`; on macOS 13 (no `openSettings`) it
-  sends `showSettingsWindow:`. APIs newer than macOS 13 go behind
-  `#available` (e.g. `typeOhFocusEffectDisabled()`).
+  sends `showSettingsWindow:`.
+- APIs newer than macOS 13 need **both** guards: `#if !TYPEOH_MACOS13_SDK`
+  (defined only by `Package.swift`; the 13.3 SDK doesn't declare them, so
+  `#available` alone fails to compile) and `#available` (runtime). Examples:
+  `typeOhFocusEffectDisabled()`, `OpenSettingsActionBridge`. Building with the
+  Xcode / macOS 26 SDK does not catch a missing compile guard.
 - Every SwiftUI view struct is marked `@MainActor` (implied by newer SDKs).
 - The tests use Swift Testing, which the 5.10 toolchain lacks; they can't run
   on the Intel machine.
