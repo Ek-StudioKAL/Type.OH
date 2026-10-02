@@ -64,7 +64,7 @@ Single app target. Key components by folder:
 ### `UI/`
 - `MenuBarContent.swift` — tray menu
 - `RecordingOverlay.swift` — dictation HUD (timer, model + permission badges, Done) in a non-activating `NSPanel`
-- `AIEditorPanel.swift` — ReType: mode toolbar (Fix / Improve / Style / Translate, ⌘1–⌘4) → `StyleChipRow` / `LanguagePicker` → Input / Result cards → Return runs the action, then Insert
+- `AIEditorPanel.swift` — ReType: mode toolbar (Fix / Improve / Style / Translate, ⌘1–⌘4) → `StyleChipRow` / `LanguagePicker` → Input / Result cards (draggable divider, split remembered) → Return runs the action, then Insert
 - `ScratchpadView.swift` / `ScratchpadPanel.swift` — LazyPad window (toolbar actions have ⇧⌘ shortcuts)
 - `TypeOhTouchBar.swift` — LazyPad / ReType Touch Bar; buttons post notifications the views handle
 - `ToastOverlay.swift` — transient messages; pass `kind: .info / .warning / .error`

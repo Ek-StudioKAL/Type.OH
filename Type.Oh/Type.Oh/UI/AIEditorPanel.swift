@@ -30,6 +30,10 @@ enum EditorMode: String, CaseIterable {
     @State private var targetLanguage  = Locale.Language(identifier: "en")
     @State private var hasLoadedTranslationSettings = false
 
+    /// Share of the card area the Input card gets while a Result is shown.
+    /// Set by dragging the divider between the cards; remembered across launches.
+    @AppStorage("typeoh.retype.inputFraction") private var inputFraction = 0.5
+
     init(originalText: String, isSticky: Bool = false, onApply: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
         self.originalText = originalText
         self.isSticky = isSticky
@@ -50,10 +54,10 @@ enum EditorMode: String, CaseIterable {
                 translateRow
             }
 
-            inputCard
-
-            if !result.isEmpty {
-                resultCard
+            if result.isEmpty {
+                inputCard
+            } else {
+                splitCards
             }
 
             if let msg = errorMessage {
@@ -230,6 +234,25 @@ enum EditorMode: String, CaseIterable {
                     .stroke(Color.accentColor.opacity(0.35), lineWidth: 1)
             )
             .frame(minHeight: 60, maxHeight: .infinity)
+        }
+    }
+
+    /// Input above Result with a draggable divider between them.
+    private var splitCards: some View {
+        GeometryReader { proxy in
+            let available = max(0, proxy.size.height - CardSplitHandle.height)
+            // Each card keeps room for its header plus a few lines.
+            let minFraction = available > 0 ? min(0.45, 90 / Double(available)) : 0.5
+            let range = minFraction...(1 - minFraction)
+            let fraction = min(max(inputFraction, range.lowerBound), range.upperBound)
+
+            VStack(spacing: 0) {
+                inputCard
+                    .frame(height: available * fraction)
+                CardSplitHandle(fraction: $inputFraction, availableHeight: available, range: range)
+                resultCard
+                    .frame(height: available * (1 - fraction))
+            }
         }
     }
 
@@ -597,6 +620,62 @@ enum EditorMode: String, CaseIterable {
         .onHover { isHovering = $0 }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovering)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isActive)
+    }
+}
+
+/// Divider between ReType's Input and Result cards: drag to give one card
+/// more room, double-click to split them evenly. VoiceOver users adjust it
+/// with the increment / decrement actions.
+@MainActor private struct CardSplitHandle: View {
+    static let height: CGFloat = 14
+
+    @Binding var fraction: Double
+    let availableHeight: CGFloat
+    let range: ClosedRange<Double>
+
+    @State private var dragStartFraction: Double?
+    @State private var isHovering = false
+
+    private func clamped(_ value: Double) -> Double {
+        min(max(value, range.lowerBound), range.upperBound)
+    }
+
+    var body: some View {
+        Capsule()
+            .fill(Color.secondary.opacity(isHovering || dragStartFraction != nil ? 0.6 : 0.3))
+            .frame(width: 36, height: 4)
+            .frame(maxWidth: .infinity)
+            .frame(height: Self.height)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                isHovering = inside
+                if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+            }
+            .onDisappear {
+                if isHovering { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        guard availableHeight > 0 else { return }
+                        let start = dragStartFraction ?? clamped(fraction)
+                        dragStartFraction = start
+                        fraction = clamped(start + value.translation.height / availableHeight)
+                    }
+                    .onEnded { _ in dragStartFraction = nil }
+            )
+            .onTapGesture(count: 2) { fraction = clamped(0.5) }
+            .help("Drag to resize Input and Result — double-click to split evenly")
+            .accessibilityElement()
+            .accessibilityLabel("Input and Result divider")
+            .accessibilityValue("Input \(Int((clamped(fraction) * 100).rounded())) percent")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: fraction = clamped(clamped(fraction) + 0.1)
+                case .decrement: fraction = clamped(clamped(fraction) - 0.1)
+                @unknown default: break
+                }
+            }
     }
 }
 
