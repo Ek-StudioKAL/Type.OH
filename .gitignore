@@ -4,3 +4,7 @@
 # SwiftPM build output (macOS 13 / Intel build, see Type.Oh/build-app.sh)
 .build/
 Type.Oh/build/ventura/
+
+# Icon design workspace (reference sheets render Apple SF Symbols; the
+# shipped icon sources live in Type.Oh/icons/svg)
+icon-redesign/

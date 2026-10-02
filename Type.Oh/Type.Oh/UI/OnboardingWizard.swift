@@ -208,17 +208,17 @@ import SwiftUI
                 .font(.body)
 
             featureRow(
-                icon: "mic.fill",
+                icon: .voiceToText,
                 title: "\(HotkeyConfig.defaultVoice.displayString) — Voice to text",
                 detail: "Hold the hotkey, speak, release. Transcribed locally and pasted at your cursor."
             )
             featureRow(
-                icon: "wand.and.stars",
+                icon: .aiEditor,
                 title: "\(HotkeyConfig.defaultEditor.displayString) — AI editor",
                 detail: "Select text in any app, press the hotkey, fix / restyle / translate, then apply."
             )
             featureRow(
-                icon: "note.text",
+                icon: .lazypad,
                 title: "\(HotkeyConfig.defaultScratchpad.displayString) — LazyPad",
                 detail: "Open your scratchpad workspace for longer edits and reusable style presets."
             )
@@ -231,10 +231,9 @@ import SwiftUI
     }
 
     @ViewBuilder
-    private func featureRow(icon: String, title: String, detail: String) -> some View {
+    private func featureRow(icon: AppIcon, title: String, detail: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: icon)
-                .font(.title2)
+            Image(appIcon: icon, size: 24)
                 .foregroundStyle(.tint)
                 .frame(width: 30)
             VStack(alignment: .leading, spacing: 3) {
@@ -262,7 +261,7 @@ import SwiftUI
             Text("Type.OH can use Apple Intelligence as its default on-device AI provider when this Mac and OS support it.")
 
             HStack(spacing: 8) {
-                Image(systemName: available ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                Image(appIcon: available ? .granted : .warning, size: 17)
                     .foregroundStyle(available ? .green : .orange)
                 Text(status)
                     .font(.body.weight(.medium))
@@ -350,9 +349,8 @@ import SwiftUI
     @ViewBuilder
     private func axRow() -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: axTrusted ? "checkmark.circle.fill" : "xmark.circle.fill")
+            Image(appIcon: axTrusted ? .granted : .denied, size: 20)
                 .foregroundStyle(axTrusted ? .green : .red)
-                .font(.title3)
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 6) {
                 Text("Accessibility").font(.body.weight(.medium))
@@ -384,9 +382,8 @@ import SwiftUI
     @ViewBuilder
     private func permissionRow(title: String, detail: String, granted: Bool, openButton: String, action: @escaping () -> Void) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: granted ? "checkmark.circle.fill" : "xmark.circle.fill")
+            Image(appIcon: granted ? .granted : .denied, size: 20)
                 .foregroundStyle(granted ? .green : .red)
-                .font(.title3)
                 .padding(.top, 2)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.body.weight(.medium))
@@ -516,7 +513,7 @@ import SwiftUI
                 settings.whisperModel = m.id
                 settings.save()
             } label: {
-                Image(systemName: isActive ? "largecircle.fill.circle" : "circle")
+                Image(appIcon: isActive ? .stepActive : .stepInactive, size: 17)
                     .foregroundStyle(isActive ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(HierarchicalShapeStyle.secondary))
             }
             .buttonStyle(.plain)
@@ -538,7 +535,7 @@ import SwiftUI
                         .foregroundStyle(.secondary)
                 }
             } else if downloaded {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Image(appIcon: .granted, size: 16).foregroundStyle(.green)
             } else {
                 Button("Download") {
                     Task { try? await manager.download(m.id) }

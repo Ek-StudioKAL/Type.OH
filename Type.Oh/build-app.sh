@@ -77,12 +77,9 @@ M="$SRC/Assets.xcassets/menuBarIcon.appiconset"
 cp "$M/TypeOh-icons_9Shape - Flat color negative_Artboard 133.png" "$APP/Contents/Resources/menuBarIcon.png"
 cp "$M/TypeOh-icons_9Shape - Flat color negative_Artboard 164.png" "$APP/Contents/Resources/menuBarIcon@2x.png"
 
-# Provider brand symbols (loaded by BrandImage when there is no asset catalog).
-# The .symbolset files are SF Symbols *templates* (whole artboard, all weights);
-# extract just the Regular-S glyph so NSImage renders an icon, not a rectangle.
-python3 "$ROOT/tools/extract-symbol-glyph.py" "$SRC/Assets.xcassets/Claude.symbolset/claude-symbol.svg" "$APP/Contents/Resources/Claude.svg"
-python3 "$ROOT/tools/extract-symbol-glyph.py" "$SRC/Assets.xcassets/GPT.symbolset/GPT-symbol.svg"       "$APP/Contents/Resources/GPT.svg"
-python3 "$ROOT/tools/extract-symbol-glyph.py" "$SRC/Assets.xcassets/Gemini.symbolset/Gemini-symbol.svg" "$APP/Contents/Resources/Gemini.svg"
+# App icon set (vector PDFs from tools/build-icons.swift; AppIcon loads them
+# from Contents/Resources — Xcode copies the same folder automatically).
+cp "$SRC"/Icons/icon-*.pdf "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

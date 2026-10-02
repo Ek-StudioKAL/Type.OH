@@ -360,7 +360,7 @@ private enum ScratchpadAction {
                             ForEach(StylePresets.all) { preset in
                                 sidebarButton(
                                     title: preset.label,
-                                    systemImage: styleSymbol(for: preset),
+                                    icon: styleIcon(for: preset),
                                     isSelected: false
                                 ) {
                                     runAction(.style(preset))
@@ -436,11 +436,11 @@ private enum ScratchpadAction {
             Divider()
 
             HStack(spacing: 10) {
-                bottomIconButton(title: "Settings", systemImage: "gearshape") {
+                bottomIconButton(title: "Settings", icon: .settings) {
                     SettingsWindowOpener.open()
                 }
 
-                bottomIconButton(title: "Setup", systemImage: "wand.and.stars") {
+                bottomIconButton(title: "Setup", icon: .improve) {
                     NotificationCenter.default.post(name: NSNotification.Name("typeoh.showOnboarding"), object: nil)
                 }
             }
@@ -474,33 +474,33 @@ private enum ScratchpadAction {
             HStack(alignment: .top, spacing: 10) {
                 toolbarButton(
                     title: sidebarIsVisible(for: availableWidth) ? "Hide" : "Show",
-                    systemImage: sidebarIsVisible(for: availableWidth) ? "sidebar.left" : "sidebar.right"
+                    icon: sidebarIsVisible(for: availableWidth) ? .hideSidebar : .showSidebar
                 ) {
                     withAnimation(.easeInOut(duration: 0.18)) {
                         isSidebarVisible.toggle()
                     }
                 }
 
-                toolbarButton(title: "Dictate", systemImage: "mic") {
+                toolbarButton(title: "Dictate", icon: .dictate) {
                     NotificationCenter.default.post(name: NSNotification.Name("typeoh.scratchpad.dictation"), object: nil)
                 }
 
-                toolbarButton(title: "Improve", systemImage: "wand.and.stars") {
+                toolbarButton(title: "Improve", icon: .improve) {
                     runAction(.improve)
                 }
                 .disabled(isProcessing || text.isEmpty)
 
-                toolbarButton(title: "Fix", systemImage: "square.and.pencil") {
+                toolbarButton(title: "Fix", icon: .fix) {
                     runAction(.fix)
                 }
                 .disabled(isProcessing || text.isEmpty)
 
-                toolbarButton(title: "Concise", systemImage: "scissors") {
+                toolbarButton(title: "Concise", icon: .concise) {
                     runAction(.concise)
                 }
                 .disabled(isProcessing || text.isEmpty)
 
-                toolbarButton(title: "Translate", systemImage: "character.book.closed") {
+                toolbarButton(title: "Translate", icon: .translate) {
                     runAction(.translate)
                 }
                 .disabled(isProcessing || text.isEmpty)
@@ -527,7 +527,7 @@ private enum ScratchpadAction {
                     }
                 }
 
-                toolbarButton(title: "Lang", systemImage: isTranslationPickerVisible ? "chevron.up" : "globe") {
+                toolbarButton(title: "Lang", icon: isTranslationPickerVisible ? .chevronUp : .language) {
                     withAnimation(.easeInOut(duration: 0.16)) {
                         isTranslationPickerVisible.toggle()
                     }
@@ -538,19 +538,19 @@ private enum ScratchpadAction {
 
                 // Grouped: the macOS 13 SDK's ViewBuilder takes at most 10 children.
                 Group {
-                toolbarButton(title: "Paste", systemImage: "arrowshape.turn.up.right") {
+                toolbarButton(title: "Paste", icon: .pasteToApp) {
                     Task { await pasteToLastApp() }
                 }
                 .disabled(text.isEmpty)
 
-                toolbarButton(title: "Copy", systemImage: "doc.on.doc") {
+                toolbarButton(title: "Copy", icon: .copy) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                     setStatus("Copied full text to clipboard.")
                 }
                 .disabled(text.isEmpty)
 
-                toolbarButton(title: "Clear", systemImage: "trash") {
+                toolbarButton(title: "Clear", icon: .clear) {
                     textViewController.resetText(to: "")
                     text = ""
                     selectedRange = NSRange(location: 0, length: 0)
@@ -587,8 +587,7 @@ private enum ScratchpadAction {
                     isTranslationPickerVisible = false
                 }
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 13, weight: .regular))
+                Image(appIcon: .denied, size: 17)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -657,33 +656,11 @@ private enum ScratchpadAction {
     }
 
     @ViewBuilder
-    private func toolbarButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func toolbarButton(title: String, icon: AppIcon, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            AccentToolbarLabel(title: title, systemImage: systemImage)
+            AccentToolbarLabel(title: title, icon: icon)
         }
         .buttonStyle(.plain)
-    }
-
-    /// Renders a literal SF Symbols private-use codepoint (e.g. one pasted
-    /// directly from the SF Symbols app). Used when the symbol's *name* isn't
-    /// known but the glyph is.
-    @ViewBuilder
-    private func toolbarButton(title: String, literalGlyph: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            AccentToolbarLabel(title: title, systemImage: "", literalGlyph: literalGlyph)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func providerSymbol(for provider: ProviderID) -> String {
-        switch provider {
-        #if canImport(FoundationModels)
-        case .appleOnDevice: "apple.logo"
-        #endif
-        case .anthropic: "text.quote"
-        case .openAI: "bubble.left.and.bubble.right"
-        case .google: "g.circle"
-        }
     }
 
     private var currentProviderToolbarTitle: String {
@@ -705,17 +682,6 @@ private enum ScratchpadAction {
         case .anthropic: "Anthropic Claude"
         case .openAI: "OpenAI ChatGPT"
         case .google: "Google Gemini"
-        }
-    }
-
-    private func styleSymbol(for preset: StylePreset) -> String {
-        switch preset.id {
-        case "boomer": "newspaper"
-        case "genx": "bolt.horizontal"
-        case "millennial": "bubble.left.and.bubble.right"
-        case "genz": "sparkles"
-        case "alpha": "flame"
-        default: "paintbrush"
         }
     }
 
@@ -753,8 +719,7 @@ private enum ScratchpadAction {
         Button {
             openSettingsAt(.presets)
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 11, weight: .semibold))
+            Image(appIcon: .add, size: 14, bold: true)
                 .foregroundStyle(.secondary)
                 .frame(width: 18, height: 18)
                 .background(Color.secondary.opacity(0.15), in: Circle())
@@ -808,10 +773,10 @@ private enum ScratchpadAction {
     }
 
     @ViewBuilder
-    private func sidebarButton(title: String, systemImage: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    private func sidebarButton(title: String, icon: AppIcon, isSelected: Bool, action: @escaping () -> Void) -> some View {
         SidebarHoverRow(isSelected: isSelected, action: action) {
             HStack(spacing: 10) {
-                Image(systemName: systemImage)
+                Image(appIcon: icon, size: 18, bold: isSelected)
                     .frame(width: 18)
                 Text(title)
                     .fontWeight(isSelected ? .semibold : .regular)
@@ -834,8 +799,7 @@ private enum ScratchpadAction {
                     .fontWeight(isSelected ? .semibold : .regular)
                 Spacer(minLength: 0)
                 if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.caption.weight(.bold))
+                    Image(appIcon: .selected, size: 14, bold: true)
                 }
             }
         }
@@ -851,18 +815,18 @@ private enum ScratchpadAction {
                 .symbolRenderingMode(.hierarchical)
         #endif
         case .anthropic:
-            BrandImage(name: "Claude")
+            Image(appIcon: .anthropicProvider, size: 18)
         case .openAI:
-            BrandImage(name: "GPT")
+            Image(appIcon: .openAIProvider, size: 18)
         case .google:
-            BrandImage(name: "Gemini")
+            Image(appIcon: .googleProvider, size: 18)
         }
     }
 
     @ViewBuilder
-    private func bottomIconButton(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+    private func bottomIconButton(title: String, icon: AppIcon, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            AccentToolbarLabel(title: title, systemImage: systemImage)
+            AccentToolbarLabel(title: title, icon: icon)
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)

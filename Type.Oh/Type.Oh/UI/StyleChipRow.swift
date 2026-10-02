@@ -18,16 +18,16 @@ import SwiftUI
     }
 }
 
-/// SF Symbol per style preset — mirrors the symbols used in LazyPad's sidebar
+/// Icon per style preset — shared by the ReType chips and LazyPad's sidebar
 /// so the two surfaces feel like one design system.
-func styleSymbol(for preset: StylePreset) -> String {
+func styleIcon(for preset: StylePreset) -> AppIcon {
     switch preset.id {
-    case "boomer":     "newspaper"
-    case "genx":       "bolt.horizontal"
-    case "millennial": "bubble.left.and.bubble.right"
-    case "genz":       "sparkles"
-    case "alpha":      "flame"
-    default:           "paintbrush"
+    case "boomer":     .boomer
+    case "genx":       .genX
+    case "millennial": .millennial
+    case "genz":       .genZ
+    case "alpha":      .genAlpha
+    default:           .style
     }
 }
 
@@ -56,9 +56,7 @@ func styleSymbol(for preset: StylePreset) -> String {
 
     private var capsule: some View {
         HStack(spacing: 6) {
-            Image(systemName: styleSymbol(for: preset))
-                .font(.system(size: 13, weight: tinted ? .semibold : .regular))
-                .symbolRenderingMode(.hierarchical)
+            Image(appIcon: styleIcon(for: preset), size: 17, bold: tinted)
             Text(preset.label)
                 .font(.callout.weight(tinted ? .semibold : .regular))
         }

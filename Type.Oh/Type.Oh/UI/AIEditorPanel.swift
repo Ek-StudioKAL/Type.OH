@@ -66,16 +66,16 @@ import SwiftUI
 
     private var toolbar: some View {
         HStack(alignment: .top, spacing: 10) {
-            toolbarButton(title: "Fix", systemImage: "square.and.pencil", isActive: mode == .fix) {
+            toolbarButton(title: "Fix", icon: .fix, isActive: mode == .fix) {
                 setMode(.fix)
             }
-            toolbarButton(title: "Improve", systemImage: "wand.and.stars", isActive: mode == .improve) {
+            toolbarButton(title: "Improve", icon: .improve, isActive: mode == .improve) {
                 setMode(.improve)
             }
-            toolbarButton(title: "Style", systemImage: "paintbrush", isActive: mode == .style) {
+            toolbarButton(title: "Style", icon: .style, isActive: mode == .style) {
                 setMode(.style)
             }
-            toolbarButton(title: "Translate", systemImage: "character.book.closed", isActive: mode == .translate) {
+            toolbarButton(title: "Translate", icon: .translate, isActive: mode == .translate) {
                 setMode(.translate)
             }
             .contextMenu {
@@ -101,7 +101,7 @@ import SwiftUI
 
             Spacer(minLength: 12)
 
-            toolbarButton(title: "Paste", systemImage: "doc.on.clipboard") {
+            toolbarButton(title: "Paste", icon: .paste) {
                 if let clip = NSPasteboard.general.string(forType: .string), !clip.isEmpty {
                     editableInput = clip
                     result = ""
@@ -109,7 +109,7 @@ import SwiftUI
                 }
             }
 
-            toolbarButton(title: "Copy", systemImage: "doc.on.doc") {
+            toolbarButton(title: "Copy", icon: .copy) {
                 let textToCopy = result.isEmpty ? editableInput : result
                 guard !textToCopy.isEmpty else { return }
                 NSPasteboard.general.clearContents()
@@ -141,8 +141,7 @@ import SwiftUI
             Button {
                 openSettingsAt(.translation)
             } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 12, weight: .regular))
+                Image(appIcon: .settings, size: 16)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -188,8 +187,12 @@ import SwiftUI
                         NSPasteboard.general.setString(result, forType: .string)
                         setStatus("Copied result to clipboard.")
                     } label: {
-                        Label("Copy", systemImage: "doc.on.doc")
-                            .font(.caption)
+                        Label {
+                            Text("Copy")
+                        } icon: {
+                            Image(appIcon: .copy, size: 13)
+                        }
+                        .font(.caption)
                     }
                     .buttonStyle(.borderless)
                     .help("Copy result to clipboard")
@@ -228,7 +231,7 @@ import SwiftUI
     private func errorBanner(_ msg: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                Image(appIcon: .warning, size: 15)
                     .foregroundStyle(.red)
                 Text(msg)
                     .font(.caption)
@@ -291,9 +294,9 @@ import SwiftUI
     // MARK: - Toolbar primitives (mirrors LazyPad)
 
     @ViewBuilder
-    private func toolbarButton(title: String, systemImage: String, isActive: Bool = false, action: @escaping () -> Void) -> some View {
+    private func toolbarButton(title: String, icon: AppIcon, isActive: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            AccentToolbarLabel(title: title, systemImage: systemImage, isActive: isActive)
+            AccentToolbarLabel(title: title, icon: icon, isActive: isActive)
         }
         .buttonStyle(.plain)
     }
@@ -480,9 +483,8 @@ import SwiftUI
 /// - Subtle scale / opacity transition on hover to feel alive.
 @MainActor struct AccentToolbarLabel: View {
     let title: String
-    let systemImage: String
+    let icon: AppIcon
     var isActive: Bool = false
-    var literalGlyph: String? = nil
 
     @State private var isHovering = false
 
@@ -490,16 +492,7 @@ import SwiftUI
 
     var body: some View {
         VStack(spacing: 4) {
-            Group {
-                if let literalGlyph {
-                    Text(literalGlyph)
-                        .font(.system(size: 17, weight: tinted ? .semibold : .regular))
-                } else {
-                    Image(systemName: systemImage)
-                        .font(.system(size: 17, weight: tinted ? .semibold : .regular))
-                        .symbolRenderingMode(.hierarchical)
-                }
-            }
+            Image(appIcon: icon, size: 22, bold: tinted)
             .foregroundStyle(tinted ? Color.accentColor : .primary)
             .frame(width: 28, height: 22)
             .scaleEffect(isHovering && !isActive ? 1.06 : 1.0)
@@ -547,7 +540,7 @@ import SwiftUI
                 .padding(.top, 2)
             } else {
                 HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    Image(appIcon: .warning, size: 17)
                         .foregroundStyle(.orange)
                     Text("Accessibility permission missing")
                         .font(.body.weight(.medium))

@@ -65,6 +65,7 @@ Single app target. Key components by folder:
 - `AIEditorPanel.swift` — main editor: `ModeTabs` (Translate/Style/Fix) → `StyleChipRow` / `LanguagePicker` / `EmojifyToggle` / `DiffTextView` → Apply/Cancel
 - `DiffTextView.swift` — Fix mode diff (original with strikethrough / result)
 - `SettingsWindow.swift` — hotkeys, Whisper model download, language, provider + masked key display
+- `AppIcon.swift` — the app's own icon set (`Image(appIcon: .translate, size: 22, bold: isActive)`); see "Icons" below
 
 ### App Entry
 - `Type_OhApp.swift` — `@main`, `MenuBarExtra`, AppDelegate adapter
@@ -107,6 +108,24 @@ swift-transformers 0.1.8 are vendored under `Vendor/` (patched; see
 - Every SwiftUI view struct is marked `@MainActor` (implied by newer SDKs).
 - The tests use Swift Testing, which the 5.10 toolchain lacks; they can't run
   on the Intel machine.
+
+## Icons
+
+The UI uses Type.OH's own monoline icon set, not SF Symbols (only Apple's
+marks — `apple.logo`, `apple.intelligence` — stay system symbols, for the
+Apple Intelligence provider).
+
+- Sources: `icons/svg/NN-name.svg` (24×24, 1.5 px round strokes, `currentColor`;
+  `icons/preview.png` shows the set).
+- `swift tools/build-icons.swift` renders them into `Type.Oh/Icons/icon-<name>.pdf`
+  plus `-bold` (2 px) variants. Run it after any SVG change and commit the PDFs.
+  Masked cut-outs are rebuilt as exact vector geometry; the script fails if any
+  PDF would contain a bitmap.
+- Xcode bundles `Type.Oh/Icons/` automatically; `build-app.sh` copies it for the
+  SwiftPM build. Both load the same PDFs through `AppIcon`, so the icons look
+  identical on macOS 26 and macOS 13.
+- New icon: add the SVG, a case to `AppIcon` (raw value = file name without the
+  number), re-run the script.
 
 ## Entitlements Required
 

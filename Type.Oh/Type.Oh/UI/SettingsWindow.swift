@@ -15,13 +15,13 @@ enum SettingsTab: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    var systemImage: String {
+    var icon: AppIcon {
         switch self {
-        case .general: "gear"
-        case .providers: "brain.head.profile"
-        case .presets: "paintbrush"
-        case .translation: "character.book.closed"
-        case .models: "waveform"
+        case .general: .generalSettings
+        case .providers: .aiProviders
+        case .presets: .style
+        case .translation: .translate
+        case .models: .voiceModel
         }
     }
 }
@@ -123,7 +123,7 @@ enum SettingsTabRoute {
                 } label: {
                     AccentToolbarLabel(
                         title: tab.title,
-                        systemImage: tab.systemImage,
+                        icon: tab.icon,
                         isActive: selectedTab == tab
                     )
                 }
@@ -257,9 +257,8 @@ enum SettingsTabRoute {
                         HStack {
                             Text(p.displayName)
                             if p.requiresAPIKey && keyPresent[p] == false {
-                                Image(systemName: "exclamationmark.circle.fill")
+                                Image(appIcon: .needsAttention, size: 13)
                                     .foregroundStyle(.orange)
-                                    .imageScale(.small)
                             }
                         }
                         .tag(p)
@@ -268,10 +267,11 @@ enum SettingsTabRoute {
                 .onChange(of: settings.activeProvider) { _ in settings.save() }
 
                 if settings.activeProvider.requiresAPIKey && keyPresent[settings.activeProvider] == false {
-                    Label(
-                        "\(settings.activeProvider.displayName) requires an API key — add it below.",
-                        systemImage: "exclamationmark.triangle.fill"
-                    )
+                    Label {
+                        Text("\(settings.activeProvider.displayName) requires an API key — add it below.")
+                    } icon: {
+                        Image(appIcon: .warning, size: 14)
+                    }
                     .font(.caption)
                     .foregroundStyle(.orange)
                 }
@@ -472,7 +472,11 @@ enum SettingsTabRoute {
                 Button {
                     NotificationCenter.default.post(name: NSNotification.Name("typeoh.whisper.reload"), object: nil)
                 } label: {
-                    Label("Reload Selected Model", systemImage: "arrow.clockwise")
+                    Label {
+                        Text("Reload Selected Model")
+                    } icon: {
+                        Image(appIcon: .reload, size: 16)
+                    }
                 }
                 .buttonStyle(.bordered)
                 .disabled(!manager.isDownloaded(settings.whisperModel))
@@ -545,13 +549,13 @@ enum SettingsTabRoute {
         HStack(spacing: 6) {
             if let loaded = manager.loadedModelID,
                let info = manager.catalogue.first(where: { $0.id == loaded }) {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Image(appIcon: .granted, size: 16).foregroundStyle(.green)
                 Text("Loaded: \(info.displayName)")
             } else if manager.isDownloaded(settings.whisperModel) {
-                Image(systemName: "circle.fill").foregroundStyle(.teal)
+                Image(appIcon: .statusDot, size: 16).foregroundStyle(.teal)
                 Text("Ready").foregroundStyle(.secondary)
             } else {
-                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                Image(appIcon: .needsAttention, size: 16).foregroundStyle(.orange)
                 Text("No model").foregroundStyle(.secondary)
             }
         }
@@ -576,7 +580,7 @@ enum SettingsTabRoute {
                         .foregroundStyle(.secondary)
                 }
             } else if downloaded {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                Image(appIcon: .granted, size: 16).foregroundStyle(.green)
             } else {
                 Button("Download") {
                     Task { try? await manager.download(m.id) }
@@ -619,7 +623,11 @@ enum SettingsTabRoute {
                     Button {
                         beginAdding()
                     } label: {
-                        Label("Add Preset", systemImage: "plus.circle")
+                        Label {
+                            Text("Add Preset")
+                        } icon: {
+                            Image(appIcon: .addPreset, size: 16)
+                        }
                     }
                     .buttonStyle(.bordered)
                 }
@@ -686,7 +694,7 @@ enum SettingsTabRoute {
                 settings.customStylePresets.removeAll { $0.id == preset.id }
                 settings.save()
             } label: {
-                Image(systemName: "trash")
+                Image(appIcon: .clear, size: 15)
             }
             .buttonStyle(.borderless)
             .controlSize(.small)

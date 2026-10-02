@@ -115,7 +115,7 @@ func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: Ho
             Button {
                 onClear()
             } label: {
-                Image(systemName: "xmark.circle.fill")
+                Image(appIcon: .denied, size: 16)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)

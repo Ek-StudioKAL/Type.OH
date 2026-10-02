@@ -56,7 +56,7 @@ final class ToastOverlay {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            Image(appIcon: .warning, size: 16)
                 .foregroundStyle(.yellow)
             Text(message)
                 .font(.callout)

@@ -39,8 +39,7 @@ enum LanguagePickerAvailability: Equatable {
             Button {
                 swap()
             } label: {
-                Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 12, weight: .semibold))
+                Image(appIcon: .swapLanguages, size: 16, bold: true)
                     .frame(width: 26, height: 26)
                     .background(
                         Circle().fill(Color.secondary.opacity(0.12))
@@ -164,15 +163,13 @@ enum LanguagePickerAvailability: Equatable {
         } label: {
             HStack(spacing: 6) {
                 if isAuto {
-                    Image(systemName: "sparkle")
-                        .font(.caption2)
+                    Image(appIcon: .autoDetect, size: 13)
                         .foregroundStyle(.secondary)
                 }
                 Text(title)
                     .font(.callout)
                     .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
+                Image(appIcon: .chevronDown, size: 12, bold: true)
                     .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 10)
@@ -199,16 +196,14 @@ enum LanguagePickerAvailability: Equatable {
     private var popoverContent: some View {
         VStack(spacing: 0) {
             HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(.caption)
+                Image(appIcon: .search, size: 14)
                     .foregroundStyle(.secondary)
                 TextField("Search languages", text: $query)
                     .textFieldStyle(.plain)
                     .font(.callout)
                 if !query.isEmpty {
                     Button { query = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.caption)
+                        Image(appIcon: .denied, size: 14)
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
@@ -222,7 +217,7 @@ enum LanguagePickerAvailability: Equatable {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     if includeAuto, query.isEmpty {
-                        row(label: autoTitle, systemImage: "sparkle") {
+                        row(label: autoTitle, icon: .autoDetect) {
                             onSelect(nil)
                             isShowingPopover = false
                         }
@@ -267,18 +262,18 @@ enum LanguagePickerAvailability: Equatable {
 
     @ViewBuilder
     private func languageRow(_ lang: Locale.Language) -> some View {
-        row(label: displayName(lang), systemImage: nil) {
+        row(label: displayName(lang), icon: nil) {
             onSelect(lang)
             isShowingPopover = false
         }
     }
 
     @ViewBuilder
-    private func row(label: String, systemImage: String?, action: @escaping () -> Void) -> some View {
+    private func row(label: String, icon: AppIcon?, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                if let systemImage {
-                    Image(systemName: systemImage)
+                if let icon {
+                    Image(appIcon: icon, size: 16)
                         .foregroundStyle(.secondary)
                         .frame(width: 16)
                 }
@@ -286,8 +281,7 @@ enum LanguagePickerAvailability: Equatable {
                     .font(.callout)
                 Spacer(minLength: 0)
                 if label == title {
-                    Image(systemName: "checkmark")
-                        .font(.caption.weight(.bold))
+                    Image(appIcon: .selected, size: 14, bold: true)
                         .foregroundStyle(Color.accentColor)
                 }
             }

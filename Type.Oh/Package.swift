@@ -37,6 +37,7 @@ let package = Package(
                 "Assets.xcassets",
                 "type-oh.icon",
                 "Type.Oh.entitlements",
+                "Icons", // copied into the app bundle by build-app.sh
             ],
             swiftSettings: macOS13SDK
         ),

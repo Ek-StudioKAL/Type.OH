@@ -61,10 +61,10 @@ enum DictationHUDPhase: Equatable {
                 HStack(spacing: 6) {
                     modelBadge
                     if phase == .processing {
-                        badge(icon: "waveform", tint: .accentColor, text: "Processing")
+                        badge(icon: .voiceModel, tint: .accentColor, text: "Processing")
                     }
-                    if !state.axTrusted { permissionBadge(label: "AX", systemImage: "exclamationmark.shield") }
-                    if !state.micAuthorized { permissionBadge(label: "Mic", systemImage: "mic.slash") }
+                    if !state.axTrusted { permissionBadge(label: "AX", icon: .accessibilityMissing) }
+                    if !state.micAuthorized { permissionBadge(label: "Mic", icon: .microphoneBlocked) }
                 }
             }
 
@@ -121,18 +121,17 @@ enum DictationHUDPhase: Equatable {
     private var modelBadge: some View {
         switch state.modelStatus {
         case .loaded(let name):
-            badge(icon: "checkmark.circle.fill", tint: .green, text: name)
+            badge(icon: .granted, tint: .green, text: name)
         case .ready(let name):
-            badge(icon: "circle.fill", tint: .teal, text: name)
+            badge(icon: .statusDot, tint: .teal, text: name)
         case .missing:
-            badge(icon: "exclamationmark.circle.fill", tint: .orange, text: "No model")
+            badge(icon: .needsAttention, tint: .orange, text: "No model")
         }
     }
 
-    private func badge(icon: String, tint: Color, text: String) -> some View {
+    private func badge(icon: AppIcon, tint: Color, text: String) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 9, weight: .semibold))
+            Image(appIcon: icon, size: 12, bold: true)
                 .foregroundStyle(tint)
             Text(text)
                 .font(.system(.caption2, design: .rounded))
@@ -140,10 +139,9 @@ enum DictationHUDPhase: Equatable {
         }
     }
 
-    private func permissionBadge(label: String, systemImage: String) -> some View {
+    private func permissionBadge(label: String, icon: AppIcon) -> some View {
         HStack(spacing: 3) {
-            Image(systemName: systemImage)
-                .font(.system(size: 9, weight: .semibold))
+            Image(appIcon: icon, size: 12, bold: true)
             Text(label)
                 .font(.system(.caption2, design: .rounded).weight(.semibold))
         }

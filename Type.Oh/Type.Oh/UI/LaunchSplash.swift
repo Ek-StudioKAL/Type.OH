@@ -65,9 +65,7 @@ import SwiftUI
                     .resizable()
                     .scaledToFit()
             } else {
-                Image(systemName: "waveform")
-                    .resizable()
-                    .scaledToFit()
+                Image(appIcon: .voiceModel, size: 96)
                     .foregroundStyle(Color.accentColor)
             }
         }

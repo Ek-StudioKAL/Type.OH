@@ -1,0 +1,255 @@
+[
+  {
+    "number": 1,
+    "name": "fix",
+    "file": "01-fix.svg"
+  },
+  {
+    "number": 2,
+    "name": "improve",
+    "file": "02-improve.svg"
+  },
+  {
+    "number": 3,
+    "name": "style",
+    "file": "03-style.svg"
+  },
+  {
+    "number": 4,
+    "name": "translate",
+    "file": "04-translate.svg"
+  },
+  {
+    "number": 5,
+    "name": "concise",
+    "file": "05-concise.svg"
+  },
+  {
+    "number": 6,
+    "name": "dictate",
+    "file": "06-dictate.svg"
+  },
+  {
+    "number": 7,
+    "name": "paste-to-app",
+    "file": "07-paste-to-app.svg"
+  },
+  {
+    "number": 8,
+    "name": "paste",
+    "file": "08-paste.svg"
+  },
+  {
+    "number": 9,
+    "name": "copy",
+    "file": "09-copy.svg"
+  },
+  {
+    "number": 10,
+    "name": "clear",
+    "file": "10-clear.svg"
+  },
+  {
+    "number": 11,
+    "name": "language",
+    "file": "11-language.svg",
+    "concept": "A speech globe: the world as a conversation."
+  },
+  {
+    "number": 12,
+    "name": "swap-languages",
+    "file": "12-swap-languages.svg"
+  },
+  {
+    "number": 13,
+    "name": "auto-detect",
+    "file": "13-auto-detect.svg"
+  },
+  {
+    "number": 14,
+    "name": "search",
+    "file": "14-search.svg"
+  },
+  {
+    "number": 15,
+    "name": "general-settings",
+    "file": "15-general-settings.svg"
+  },
+  {
+    "number": 16,
+    "name": "settings",
+    "file": "16-settings.svg"
+  },
+  {
+    "number": 17,
+    "name": "ai-providers",
+    "file": "17-ai-providers.svg",
+    "concept": "Three connected rounded nodes, for a choice of models."
+  },
+  {
+    "number": 18,
+    "name": "voice-model",
+    "file": "18-voice-model.svg",
+    "concept": "A continuous voice wave with a rounded central crest."
+  },
+  {
+    "number": 19,
+    "name": "reload",
+    "file": "19-reload.svg"
+  },
+  {
+    "number": 20,
+    "name": "add-preset",
+    "file": "20-add-preset.svg"
+  },
+  {
+    "number": 21,
+    "name": "add",
+    "file": "21-add.svg"
+  },
+  {
+    "number": 22,
+    "name": "boomer",
+    "file": "22-boomer.svg",
+    "concept": "A fountain-pen nib for a traditional writing voice."
+  },
+  {
+    "number": 23,
+    "name": "gen-x",
+    "file": "23-gen-x.svg"
+  },
+  {
+    "number": 24,
+    "name": "millennial",
+    "file": "24-millennial.svg",
+    "concept": "An instant-photo frame with a soft mountain and sun."
+  },
+  {
+    "number": 25,
+    "name": "gen-z",
+    "file": "25-gen-z.svg",
+    "concept": "A tilted sticker with a curled corner and a wink."
+  },
+  {
+    "number": 26,
+    "name": "gen-alpha",
+    "file": "26-gen-alpha.svg",
+    "concept": "A compact game controller with swept grips."
+  },
+  {
+    "number": 27,
+    "name": "anthropic-provider",
+    "file": "27-anthropic-provider.svg",
+    "source": "Claude.symbolset/claude-symbol.svg",
+    "variant": "Regular-S",
+    "geometry": "preserved from supplied artwork"
+  },
+  {
+    "number": 28,
+    "name": "google-provider",
+    "file": "28-google-provider.svg",
+    "source": "Gemini.symbolset/Gemini-symbol.svg",
+    "variant": "Regular-S",
+    "geometry": "preserved from supplied artwork"
+  },
+  {
+    "number": 29,
+    "name": "voice-to-text",
+    "file": "29-voice-to-text.svg"
+  },
+  {
+    "number": 30,
+    "name": "ai-editor",
+    "file": "30-ai-editor.svg",
+    "concept": "An editing nib meeting a small four-point spark."
+  },
+  {
+    "number": 31,
+    "name": "lazypad",
+    "file": "31-lazypad.svg",
+    "concept": "A loose note with a gently lifted lower corner."
+  },
+  {
+    "number": 32,
+    "name": "microphone-blocked",
+    "file": "32-microphone-blocked.svg"
+  },
+  {
+    "number": 33,
+    "name": "accessibility-missing",
+    "file": "33-accessibility-missing.svg"
+  },
+  {
+    "number": 34,
+    "name": "warning",
+    "file": "34-warning.svg"
+  },
+  {
+    "number": 35,
+    "name": "needs-attention",
+    "file": "35-needs-attention.svg"
+  },
+  {
+    "number": 36,
+    "name": "granted",
+    "file": "36-granted.svg"
+  },
+  {
+    "number": 37,
+    "name": "denied",
+    "file": "37-denied.svg"
+  },
+  {
+    "number": 38,
+    "name": "selected",
+    "file": "38-selected.svg"
+  },
+  {
+    "number": 39,
+    "name": "status-dot",
+    "file": "39-status-dot.svg"
+  },
+  {
+    "number": 40,
+    "name": "step-inactive",
+    "file": "40-step-inactive.svg"
+  },
+  {
+    "number": 41,
+    "name": "step-active",
+    "file": "41-step-active.svg"
+  },
+  {
+    "number": 42,
+    "name": "generic-ai-provider",
+    "file": "42-generic-ai-provider.svg"
+  },
+  {
+    "number": 43,
+    "name": "hide-sidebar",
+    "file": "43-hide-sidebar.svg"
+  },
+  {
+    "number": 44,
+    "name": "show-sidebar",
+    "file": "44-show-sidebar.svg"
+  },
+  {
+    "number": 45,
+    "name": "chevron-down",
+    "file": "45-chevron-down.svg"
+  },
+  {
+    "number": 46,
+    "name": "chevron-up",
+    "file": "46-chevron-up.svg"
+  },
+  {
+    "number": 47,
+    "name": "openai-provider",
+    "file": "47-openai-provider.svg",
+    "source": "GPT.symbolset/GPT-symbol.svg",
+    "variant": "Regular-S",
+    "geometry": "preserved from supplied artwork"
+  }
+]
