@@ -105,6 +105,10 @@ swift-transformers 0.1.8 are vendored under `Vendor/` (patched; see
   `#available` alone fails to compile) and `#available` (runtime). Examples:
   `typeOhFocusEffectDisabled()`, `OpenSettingsActionBridge`. Building with the
   Xcode / macOS 26 SDK does not catch a missing compile guard.
+- Focus rings can't be hidden on macOS 13. Where `focusEffectDisabled` is
+  missing, `typeOhFocusEffectDisabled()` instead clears the focus a window
+  gives its first button on opening (visible with keyboard navigation on).
+  Apply it to each window's root view.
 - Every SwiftUI view struct is marked `@MainActor` (implied by newer SDKs).
 - The tests use Swift Testing, which the 5.10 toolchain lacks; they can't run
   on the Intel machine.
