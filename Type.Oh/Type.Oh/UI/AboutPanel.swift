@@ -5,13 +5,14 @@ final class AboutPanelController {
     static let shared = AboutPanelController()
     private var panel: NSPanel?
 
-    func show() {
+    func show(settings: SettingsStore) {
         if let existing = panel {
             bringToFront(existing)
             return
         }
 
         let content = AboutPanelContent(
+            settings: settings,
             onOpenSettings: { [weak self] in
                 self?.close()
                 NotificationCenter.default.post(name: NSNotification.Name("typeoh.openSettings"), object: nil)
@@ -58,6 +59,7 @@ final class AboutPanelController {
 }
 
 @MainActor private struct AboutPanelContent: View {
+    @ObservedObject var settings: SettingsStore
     let onOpenSettings: () -> Void
     let onClose: () -> Void
 
@@ -82,9 +84,9 @@ final class AboutPanelController {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Hotkeys")
                     .font(.headline)
-                hotkeyRow(HotkeyConfig.defaultVoice.displayString, label: "Voice Dictation")
-                hotkeyRow(HotkeyConfig.defaultEditor.displayString, label: "AI Editor")
-                hotkeyRow(HotkeyConfig.defaultScratchpad.displayString, label: "LazyPad")
+                hotkeyRow(settings.voiceHotkey.displayString, label: "Dictate")
+                hotkeyRow(settings.editorHotkey.displayString, label: "ReType")
+                hotkeyRow(settings.scratchpadHotkey?.displayString ?? "—", label: "LazyPad")
             }
 
             Divider()
@@ -94,7 +96,7 @@ final class AboutPanelController {
                     .buttonStyle(.bordered)
                 Spacer()
                 Button("Close") { onClose() }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .keyboardShortcut(.escape)
             }
         }

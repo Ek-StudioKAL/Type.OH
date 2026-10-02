@@ -6,7 +6,7 @@ Type.OH is a native macOS writing and dictation utility for moving quickly betwe
 
 - `LazyPad`: a persistent writing window with native AppKit text editing, provider switching, custom style presets, translation, and autosave.
 - `ReType`: a selected-text popup for fixing, restyling, and translating text from other apps.
-- `Dictate`: hold-to-record speech transcription with local Whisper models.
+- `Dictate`: press the hotkey to record, press it again (or Return) to transcribe with a local Whisper model and paste.
 
 ## Screenshots
 
@@ -52,7 +52,8 @@ shortcut — hold fn to record F1–F12.
 The same actions are reachable from outside the app through the `typeoh://`
 URL scheme — `dictate`, `retype`, `lazypad`, `settings` — e.g.
 `open -g "typeoh://dictate"`. `touchbar/install.sh` turns those into Touch Bar
-Quick Actions.
+Quick Actions. While LazyPad or ReType is in front, the Touch Bar also shows
+their actions (Improve, Fix, Concise, Translate, styles; ReType's Insert).
 
 You can change or reset these in `Settings -> General`.
 

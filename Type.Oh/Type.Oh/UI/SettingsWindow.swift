@@ -24,6 +24,18 @@ enum SettingsTab: String, Codable, CaseIterable, Sendable {
         case .models: .voiceModel
         }
     }
+
+    /// Window height per tab, so short tabs don't leave half the window
+    /// empty. Longer content scrolls inside the tab's form.
+    var preferredHeight: CGFloat {
+        switch self {
+        case .general: 570
+        case .providers: 470
+        case .presets: 520
+        case .translation: 510
+        case .models: 700
+        }
+    }
 }
 
 enum SettingsTabRoute {
@@ -62,7 +74,7 @@ enum SettingsTabRoute {
 
             selectedTabContent
         }
-        .frame(width: 620, height: 680)
+        .frame(width: 620, height: selectedTab.preferredHeight)
         .background(WindowDragBehaviorConfigurator())
         .typeOhFocusEffectDisabled()
         .onAppear {
@@ -157,20 +169,16 @@ enum SettingsTabRoute {
                         .foregroundStyle(.red)
                 }
                 HStack {
-                    Button("Save Hotkeys") {
-                        saveHotkeys()
-                    }
-                    .buttonStyle(.borderedProminent)
-
                     Button("Reset Defaults") {
                         resetHotkeysToDefaults()
                     }
                     .buttonStyle(.bordered)
+                    Spacer()
+                    Text("New shortcuts apply as soon as you record them.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.top, 4)
-                Text("Changes take effect as soon as you save them.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
@@ -194,6 +202,22 @@ enum SettingsTabRoute {
         .formStyle(.grouped)
         .padding()
         .onAppear { syncHotkeyDraftsFromSettings() }
+        .onChange(of: voiceHotkeyDraft) { _ in autosaveHotkeys() }
+        .onChange(of: editorHotkeyDraft) { _ in autosaveHotkeys() }
+        .onChange(of: scratchpadHotkeyDraft) { _ in autosaveHotkeys() }
+    }
+
+    /// Save every valid change right away, like the rest of Settings. An
+    /// invalid combination (missing modifier, duplicate) shows the error and
+    /// keeps the last saved hotkeys until it's fixed.
+    private func autosaveHotkeys() {
+        guard voiceHotkeyDraft != settings.voiceHotkey
+                || editorHotkeyDraft != settings.editorHotkey
+                || scratchpadHotkeyDraft != settings.scratchpadHotkey else {
+            hotkeyError = nil
+            return
+        }
+        saveHotkeys()
     }
 
     private func toggleLoginItem(_ enabled: Bool) {
@@ -365,6 +389,7 @@ enum SettingsTabRoute {
     @State private var ramTimer: Timer?
     @State private var showReloadPrompt = false
     @State private var pendingSwitchModel: String?
+    @State private var pendingDeleteModel: WhisperModelInfo?
 
     private var languageOptions: [Locale.Language] {
         var seen = Set<String>()
@@ -510,6 +535,33 @@ enum SettingsTabRoute {
             let info = manager.catalogue.first(where: { $0.id == model })
             Text("Restart Whisper to switch to \(info?.displayName ?? model). The currently loaded model will be unloaded and the new one loaded — this takes 1-5 s.")
         }
+        .alert("Delete \(pendingDeleteModel?.displayName ?? "model")?",
+               isPresented: Binding(
+                   get: { pendingDeleteModel != nil },
+                   set: { if !$0 { pendingDeleteModel = nil } }
+               ),
+               presenting: pendingDeleteModel) { model in
+            Button("Delete", role: .destructive) {
+                deleteModel(model)
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeleteModel = nil
+            }
+        } message: { model in
+            if model.id == settings.whisperModel {
+                Text("This frees \(model.sizeDescription). It's your active model, so dictation won't work until you download it again or pick another.")
+            } else {
+                Text("This frees \(model.sizeDescription). You can download it again any time.")
+            }
+        }
+    }
+
+    private func deleteModel(_ model: WhisperModelInfo) {
+        if manager.loadedModelID == model.id {
+            NotificationCenter.default.post(name: NSNotification.Name("typeoh.whisper.unload"), object: nil)
+        }
+        manager.delete(model.id)
+        pendingDeleteModel = nil
     }
 
     private func startRAMPolling() {
@@ -580,7 +632,19 @@ enum SettingsTabRoute {
                         .foregroundStyle(.secondary)
                 }
             } else if downloaded {
-                Image(appIcon: .granted, size: 16).foregroundStyle(.green)
+                HStack(spacing: 10) {
+                    Image(appIcon: .granted, size: 16)
+                        .foregroundStyle(.green)
+                        .accessibilityLabel("Downloaded")
+                    Button {
+                        pendingDeleteModel = m
+                    } label: {
+                        Image(appIcon: .clear, size: 15)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Delete \(m.displayName) to free \(m.sizeDescription)")
+                    .accessibilityLabel("Delete \(m.displayName)")
+                }
             } else {
                 Button("Download") {
                     Task { try? await manager.download(m.id) }
@@ -698,6 +762,8 @@ enum SettingsTabRoute {
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
+            .help("Delete \(preset.label)")
+            .accessibilityLabel("Delete \(preset.label)")
         }
     }
 

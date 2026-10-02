@@ -20,20 +20,20 @@ extension HotkeyConfig {
 }
 
 func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: HotkeyConfig?) -> String? {
-    guard let voice else { return "Voice recording needs a hotkey." }
-    guard let editor else { return "AI Editor needs a hotkey." }
+    guard let voice else { return "Dictate needs a hotkey." }
+    guard let editor else { return "ReType needs a hotkey." }
 
     func needsModifierError(_ name: String, _ hk: HotkeyConfig) -> String? {
         guard !hk.hasModifiers && !hk.isFunctionKey else { return nil }
         return "\(name) needs at least one modifier key (or a function key)."
     }
-    if let err = needsModifierError("Voice recording", voice) { return err }
-    if let err = needsModifierError("AI Editor", editor)     { return err }
+    if let err = needsModifierError("Dictate", voice) { return err }
+    if let err = needsModifierError("ReType", editor)  { return err }
     if let scratchpad, let err = needsModifierError("LazyPad", scratchpad) { return err }
 
     let assignments = [
-        ("Voice recording", voice),
-        ("AI Editor", editor),
+        ("Dictate", voice),
+        ("ReType", editor),
         ("LazyPad", scratchpad)
     ].compactMap { assignment -> (String, HotkeyConfig)? in
         guard let hotkey = assignment.1 else { return nil }
@@ -57,8 +57,8 @@ func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: Ho
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             hotkeyRow(
-                title: "Voice recording",
-                detail: "Hold to dictate text into the last focused app.",
+                title: "Dictate",
+                detail: "Press to start dictating, press again to paste the text.",
                 hotkey: Binding(
                     get: { voiceHotkey },
                     set: { if let hotkey = $0 { voiceHotkey = hotkey } }
@@ -67,8 +67,8 @@ func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: Ho
             )
 
             hotkeyRow(
-                title: "AI Editor",
-                detail: "Open the selected-text editor from anywhere.",
+                title: "ReType",
+                detail: "Fix, restyle, or translate the selected text in any app.",
                 hotkey: Binding(
                     get: { editorHotkey },
                     set: { if let hotkey = $0 { editorHotkey = hotkey } }
@@ -78,12 +78,12 @@ func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: Ho
 
             hotkeyRow(
                 title: "LazyPad",
-                detail: "Open the LazyPad workspace.",
+                detail: "Open the LazyPad writing window.",
                 hotkey: $scratchpadHotkey,
                 onClear: { scratchpadHotkey = .defaultScratchpad }
             )
 
-            Text("Defaults are \(HotkeyConfig.defaultVoice.displayString) for Voice, \(HotkeyConfig.defaultEditor.displayString) for AI Editor, and \(HotkeyConfig.defaultScratchpad.displayString) for LazyPad. Shortcuts need ⌘ / ⌃ / ⌥ / ⇧, except function keys (F1–F20), which work alone. On a MacBook keyboard, hold fn while pressing F1–F12.")
+            Text("Defaults are \(HotkeyConfig.defaultVoice.displayString) for Dictate, \(HotkeyConfig.defaultEditor.displayString) for ReType, and \(HotkeyConfig.defaultScratchpad.displayString) for LazyPad. Shortcuts need ⌘ / ⌃ / ⌥ / ⇧, except function keys (F1–F20), which work alone. On a MacBook keyboard, hold fn while pressing F1–F12.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -119,7 +119,8 @@ func validateHotkeys(voice: HotkeyConfig?, editor: HotkeyConfig?, scratchpad: Ho
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help("Clear / reset this hotkey")
+            .help("Reset \(title) to its default hotkey")
+            .accessibilityLabel("Reset \(title) hotkey")
         }
     }
 }

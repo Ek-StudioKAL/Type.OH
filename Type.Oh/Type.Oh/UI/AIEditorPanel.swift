@@ -2,6 +2,13 @@ import AppKit
 import ApplicationServices
 import SwiftUI
 
+enum EditorMode: String, CaseIterable {
+    case translate = "Translate"
+    case style     = "Style"
+    case improve   = "Improve"
+    case fix       = "Fix"
+}
+
 @MainActor struct AIEditorPanel: View {
     @EnvironmentObject private var settings: SettingsStore
 
@@ -60,24 +67,32 @@ import SwiftUI
         .background(NativeTranslationDriverView())
         .typeOhFocusEffectDisabled()
         .onAppear { loadTranslationSettingsIfNeeded() }
+        .onReceive(NotificationCenter.default.publisher(for: TypeOhTouchBar.reTypeAction)) { note in
+            guard let id = note.object as? String else { return }
+            runTouchBarAction(id)
+        }
     }
 
     // MARK: - Toolbar
 
     private var toolbar: some View {
         HStack(alignment: .top, spacing: 10) {
-            toolbarButton(title: "Fix", icon: .fix, isActive: mode == .fix) {
+            toolbarButton(title: "Fix", icon: .fix, isActive: mode == .fix, shortcut: "1") {
                 setMode(.fix)
             }
-            toolbarButton(title: "Improve", icon: .improve, isActive: mode == .improve) {
+            .help("Fix spelling and grammar (⌘1)")
+            toolbarButton(title: "Improve", icon: .improve, isActive: mode == .improve, shortcut: "2") {
                 setMode(.improve)
             }
-            toolbarButton(title: "Style", icon: .style, isActive: mode == .style) {
+            .help("Improve clarity and flow (⌘2)")
+            toolbarButton(title: "Style", icon: .style, isActive: mode == .style, shortcut: "3") {
                 setMode(.style)
             }
-            toolbarButton(title: "Translate", icon: .translate, isActive: mode == .translate) {
+            .help("Rewrite in a style preset (⌘3)")
+            toolbarButton(title: "Translate", icon: .translate, isActive: mode == .translate, shortcut: "4") {
                 setMode(.translate)
             }
+            .help("Translate: \(currentLanguagePairLabel) (⌘4)")
             .contextMenu {
                 Text(currentLanguagePairLabel)
                 Divider()
@@ -108,6 +123,7 @@ import SwiftUI
                     setStatus("Loaded \(clip.count) characters from clipboard.")
                 }
             }
+            .help("Replace the input with the clipboard")
 
             toolbarButton(title: "Copy", icon: .copy) {
                 let textToCopy = result.isEmpty ? editableInput : result
@@ -117,6 +133,7 @@ import SwiftUI
                 setStatus(result.isEmpty ? "Copied input to clipboard." : "Copied result to clipboard.")
             }
             .disabled(editableInput.isEmpty && result.isEmpty)
+            .help(result.isEmpty ? "Copy the input" : "Copy the result")
         }
         .padding(.horizontal, 2)
     }
@@ -146,6 +163,7 @@ import SwiftUI
             }
             .buttonStyle(.plain)
             .help("Open Translation Settings")
+            .accessibilityLabel("Translation Settings")
         }
         .padding(.horizontal, 2)
     }
@@ -272,33 +290,79 @@ import SwiftUI
             .toggleStyle(.checkbox)
             .font(.callout)
 
+            // Errors show in the banner above; this line carries the rest
+            // ("Copied result", "Loaded 120 characters", progress).
+            if !statusIsError {
+                Text(statusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+
             Spacer()
 
             if isProcessing {
                 ProgressView().scaleEffect(0.7)
             }
 
-            Button(actionLabel) { Task { await runAction() } }
-                .buttonStyle(.bordered)
-                .disabled(isProcessing || editableInput.isEmpty)
+            // Return always triggers the next step: run the action until
+            // there's a result, then Insert it. ⌘Return re-runs.
+            if result.isEmpty {
+                Button(actionLabel) { Task { await runAction() } }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.return)
+                    .disabled(isProcessing || editableInput.isEmpty)
+                    .help("\(actionLabel) the input (Return)")
+            } else {
+                Button("\(actionLabel) Again") { Task { await runAction() } }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(isProcessing || editableInput.isEmpty)
+                    .help("Run \(actionLabel) again (⌘Return)")
 
-            if !result.isEmpty {
                 Button("Insert") { onApply(result) }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.return)
-                    .help("Replace the original selection with the result")
+                    .help("Replace the original selection with the result (Return)")
             }
         }
+    }
+
+    /// Touch Bar buttons (`TypeOhTouchBar.reType`): pick the mode and run it
+    /// in one tap; Insert applies the result.
+    private func runTouchBarAction(_ id: String) {
+        if id == "insert" {
+            if !result.isEmpty { onApply(result) }
+            return
+        }
+        let newMode: EditorMode
+        switch id {
+        case "fix": newMode = .fix
+        case "improve": newMode = .improve
+        case "translate": newMode = .translate
+        default: return
+        }
+        guard !isProcessing, !editableInput.isEmpty else { return }
+        setMode(newMode)
+        Task { await runAction() }
     }
 
     // MARK: - Toolbar primitives (mirrors LazyPad)
 
     @ViewBuilder
-    private func toolbarButton(title: String, icon: AppIcon, isActive: Bool = false, action: @escaping () -> Void) -> some View {
+    private func toolbarButton(
+        title: String,
+        icon: AppIcon,
+        isActive: Bool = false,
+        shortcut: KeyEquivalent? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             AccentToolbarLabel(title: title, icon: icon, isActive: isActive)
         }
         .buttonStyle(.plain)
+        .keyboardShortcut(shortcut.map { KeyboardShortcut($0, modifiers: .command) })
     }
 
     // MARK: - Helpers
@@ -435,11 +499,15 @@ import SwiftUI
 
 /// A sidebar row with full-width hit area, hover tint, and selection state.
 /// Used in LazyPad for style presets, custom presets, and provider switching.
+/// `actionHint` marks rows that *run* something (styles) rather than select
+/// a setting (providers): the hint appears on the trailing edge on hover.
 @MainActor struct SidebarHoverRow<Content: View>: View {
     var isSelected: Bool = false
+    var actionHint: String? = nil
     let action: () -> Void
     @ViewBuilder let content: () -> Content
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
 
     private var fillColor: Color {
@@ -456,25 +524,33 @@ import SwiftUI
 
     var body: some View {
         Button(action: action) {
-            content()
-                .foregroundStyle(foreground)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(fillColor)
-                )
-                .contentShape(Rectangle())
+            HStack(spacing: 6) {
+                content()
+                if let actionHint, isHovering {
+                    Text(actionHint)
+                        .font(.caption.weight(.medium))
+                        .accessibilityHidden(true)
+                }
+            }
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(fillColor)
+            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .onHover { isHovering = $0 }
-        .animation(.easeOut(duration: 0.14), value: isHovering)
-        .animation(.easeOut(duration: 0.14), value: isSelected)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovering)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isSelected)
     }
 }
 
-/// A toolbar label used by both ReType (AI Editor) and LazyPad.
+/// A toolbar label used by both ReType and LazyPad.
 ///
 /// Visual language:
 /// - Symbol tinted with the accent color when `isActive` or hovered
@@ -486,6 +562,7 @@ import SwiftUI
     let icon: AppIcon
     var isActive: Bool = false
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
 
     private var tinted: Bool { isActive || isHovering }
@@ -495,7 +572,7 @@ import SwiftUI
             Image(appIcon: icon, size: 22, bold: tinted)
             .foregroundStyle(tinted ? Color.accentColor : .primary)
             .frame(width: 28, height: 22)
-            .scaleEffect(isHovering && !isActive ? 1.06 : 1.0)
+            .scaleEffect(isHovering && !isActive && !reduceMotion ? 1.06 : 1.0)
 
             Text(title)
                 .font(.caption2)
@@ -512,9 +589,14 @@ import SwiftUI
         }
         .frame(width: 62)
         .contentShape(Rectangle())
+        // One element for VoiceOver: the title, plus "selected" on the
+        // active mode / tab.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
         .onHover { isHovering = $0 }
-        .animation(.easeOut(duration: 0.14), value: isHovering)
-        .animation(.easeOut(duration: 0.14), value: isActive)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovering)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isActive)
     }
 }
 
@@ -545,7 +627,7 @@ import SwiftUI
                     Text("Accessibility permission missing")
                         .font(.body.weight(.medium))
                 }
-                Text("Type.OH needs Accessibility access to read selected text from other apps. Grant it in System Settings, then re-launch.")
+                Text("Type.OH needs Accessibility access to read selected text from other apps. Grant it in System Settings, then press the ReType hotkey again.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

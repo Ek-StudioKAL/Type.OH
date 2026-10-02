@@ -25,9 +25,11 @@ final class LaunchBootstrap: ObservableObject {
         self.whisperService = whisperService
     }
 
-    /// Run all warm-up steps in order. Bounded by a soft 8 s budget — if any
-    /// step hangs (e.g. WhisperKit network stall) the splash hides anyway so
-    /// the app remains usable.
+    /// Run all warm-up steps in order. The splash doesn't wait for them:
+    /// `AppDelegate` hides it after `AppDelegate.splashMaxDuration` and the
+    /// steps keep running in the background. A first Core ML load of a large
+    /// Whisper model can take a minute. The Whisper step is skipped when the
+    /// earlier steps already used up 8 s (e.g. a Keychain prompt left open).
     func run() async {
         let deadline = Date().addingTimeInterval(8)
         defer { finish() }

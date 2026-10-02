@@ -60,21 +60,12 @@ final class NativeTextViewController {
         return attributes
     }
 
-    /// Replace the entire contents with no undo registration. Used by `Clear`.
-    func resetText(to replacement: String) {
-        guard let textView, let textStorage = textView.textStorage else { return }
-        let fullRange = NSRange(location: 0, length: textStorage.length)
-        textStorage.beginEditing()
-        textStorage.replaceCharacters(
-            in: fullRange,
-            with: NSAttributedString(string: replacement, attributes: replacementAttributes(for: textView, at: 0))
-        )
-        textStorage.endEditing()
-        textView.undoManager?.removeAllActions()
-        textView.didChangeText()
-        textView.invalidateRenderedText()
-        textView.setSelectedRange(NSRange(location: (replacement as NSString).length, length: 0))
-        onProgrammaticEdit?()
+    /// Empty the document as one undoable edit (⌘Z brings the text back).
+    /// Used by `Clear`.
+    func clearAll() {
+        guard let textView else { return }
+        replaceAllText(with: "")
+        textView.undoManager?.setActionName("Clear")
     }
 }
 
@@ -109,7 +100,7 @@ final class NativeTextViewController {
         textContainer.widthTracksTextView = true
         layoutManager.addTextContainer(textContainer)
 
-        let textView = NSTextView(frame: .zero, textContainer: textContainer)
+        let textView = TypeOhTextView(frame: .zero, textContainer: textContainer)
         textView.minSize = NSSize(width: 0, height: 0)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
@@ -234,6 +225,17 @@ final class NativeTextViewController {
                 if self.selectedRange != range { self.selectedRange = range }
             }
         }
+    }
+}
+
+/// Text view whose Touch Bar shows the window's actions (LazyPad's
+/// Improve / Fix / …, see `TypeOhTouchBar`) next to the typing suggestions.
+/// The proxy item pulls in the bar of the next responder up the chain.
+@MainActor final class TypeOhTextView: NSTextView {
+    override func makeTouchBar() -> NSTouchBar? {
+        let bar = super.makeTouchBar() ?? NSTouchBar()
+        bar.defaultItemIdentifiers = [.otherItemsProxy, .candidateList]
+        return bar
     }
 }
 

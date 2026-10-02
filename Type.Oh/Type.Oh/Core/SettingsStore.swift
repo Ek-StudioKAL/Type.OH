@@ -50,7 +50,7 @@ enum ProviderID: String, Codable, CaseIterable, Sendable {
         case .appleOnDevice: "Apple (On-Device)"
         #endif
         case .anthropic:     "Anthropic Claude"
-        case .openAI:        "OpenAI GPT"
+        case .openAI:        "OpenAI ChatGPT"
         case .google:        "Google Gemini"
         }
     }

@@ -21,6 +21,10 @@ Notes
 - System Settings → Extensions → Touch Bar Quick Actions controls which ones
   appear; System Settings → Keyboard → Customize Control Strip places the
   button.
+- Inside the app, LazyPad and ReType have their own Touch Bar while their
+  window is in front (`UI/TypeOhTouchBar.swift`): Dictate / Improve / Fix /
+  Concise / Translate / Styles in LazyPad; Fix / Improve / Translate / Insert
+  in ReType.
 - A persistent, single-tap button *outside* the Quick Actions list would need
   the private DFRFoundation API (`DFRElementSetControlStripPresenceForIdentifier`,
   as used by Pock / BetterTouchTool). It works with SIP on but is unsupported

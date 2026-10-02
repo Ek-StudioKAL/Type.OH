@@ -83,6 +83,27 @@ final class ModelManager: ObservableObject {
             .isEmpty == false) ?? false
     }
 
+    /// Remove a downloaded model's files to free disk space. Only touches
+    /// folders inside `modelsDirectory`. If the model is loaded, unload it
+    /// first (`typeoh.whisper.unload`).
+    func delete(_ modelID: String) {
+        guard let folder = _downloadedPaths[modelID] else { return }
+        let modelsRoot = modelsDirectory.standardizedFileURL.path + "/"
+        guard folder.standardizedFileURL.path.hasPrefix(modelsRoot) else { return }
+
+        objectWillChange.send()
+        do {
+            try FileManager.default.removeItem(at: folder)
+        } catch {
+            lastError = "Couldn't delete the model: \(error.localizedDescription)"
+            return
+        }
+        _downloadedPaths[modelID] = nil
+        var stored = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) as? [String: String] ?? [:]
+        stored[modelID] = nil
+        UserDefaults.standard.set(stored, forKey: Self.defaultsKey)
+    }
+
     func download(_ modelID: String) async throws {
         downloadingModelID = modelID
         downloadProgress = 0

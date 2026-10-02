@@ -18,7 +18,7 @@ struct HotkeyValidationTests {
             scratchpad: .defaultScratchpad
         )
 
-        #expect(error == "Voice recording needs a hotkey.")
+        #expect(error == "Dictate needs a hotkey.")
     }
 
     @Test func editorHotkeyIsRequired() {
@@ -28,7 +28,7 @@ struct HotkeyValidationTests {
             scratchpad: .defaultScratchpad
         )
 
-        #expect(error == "AI Editor needs a hotkey.")
+        #expect(error == "ReType needs a hotkey.")
     }
 
     @Test func plainLetterHotkeysNeedAModifier() {
@@ -38,7 +38,7 @@ struct HotkeyValidationTests {
             scratchpad: .defaultScratchpad
         )
 
-        #expect(error == "Voice recording needs at least one modifier key (or a function key).")
+        #expect(error == "Dictate needs at least one modifier key (or a function key).")
     }
 
     @Test func functionKeysWorkWithoutModifiers() {
@@ -57,7 +57,7 @@ struct HotkeyValidationTests {
             scratchpad: .defaultScratchpad
         )
 
-        #expect(error == "Voice recording and AI Editor cannot use the same hotkey.")
+        #expect(error == "Dictate and ReType cannot use the same hotkey.")
     }
 
     @Test func scratchpadHotkeyCanBeDisabled() {

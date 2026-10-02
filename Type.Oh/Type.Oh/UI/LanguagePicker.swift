@@ -47,6 +47,7 @@ enum LanguagePickerAvailability: Equatable {
             }
             .buttonStyle(.plain)
             .help("Swap source and target")
+            .accessibilityLabel("Swap source and target languages")
             .disabled(sourceLanguage == nil)
             .opacity(sourceLanguage == nil ? 0.45 : 1.0)
             .offset(y: compact ? 0 : 9)

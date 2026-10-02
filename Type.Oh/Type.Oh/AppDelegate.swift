@@ -128,8 +128,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // First-launch onboarding handles permission prompts and warm-ups
-        // itself, so it's skipped on first launch. Returning users see the
-        // splash while the bootstrap pre-warms keychain + Whisper.
+        // itself, so it's skipped on first launch. Returning users get the
+        // bootstrap warm-up (Keychain + Whisper); the splash shows it only for
+        // launches they started themselves, not at login.
         if !settingsStore.hasCompletedOnboarding {
             showOnboarding()
         } else {
@@ -137,15 +138,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let opts = [kAXTrustedCheckOptionPrompt.takeRetainedValue() as String: true] as CFDictionary
                 AXIsProcessTrustedWithOptions(opts)
             }
-            showLaunchSplash()
+            let bootstrap = LaunchBootstrap(settings: settingsStore, whisperService: whisperService)
+            if !Self.wasLaunchedAtLogin() {
+                showLaunchSplash(for: bootstrap)
+            }
+            Task { await bootstrap.run() }
         }
     }
 
-    /// Show the launch splash and run the bootstrap. Splash hides itself when
-    /// bootstrap finishes (or after the 8 s soft budget — whichever is first).
-    private func showLaunchSplash() {
-        let bootstrap = LaunchBootstrap(settings: settingsStore, whisperService: whisperService)
+    /// Longest the splash stays up. Warm-up continues in the background after it hides.
+    static let splashMaxDuration: TimeInterval = 2.5
 
+    /// True when macOS opened the app as a login item. Login items registered
+    /// through `SMAppService` don't always carry the Apple-event flag, so a
+    /// launch within a minute and a half of the Dock starting (that is, of the
+    /// user logging in) counts too.
+    private static func wasLaunchedAtLogin() -> Bool {
+        if let event = NSAppleEventManager.shared().currentAppleEvent,
+           event.eventID == AEEventID(kAEOpenApplication),
+           event.paramDescriptor(forKeyword: AEKeyword(keyAEPropData))?.enumCodeValue == OSType(keyAELaunchedAsLogInItem) {
+            return true
+        }
+        if let dock = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first,
+           let dockLaunch = dock.launchDate,
+           Date().timeIntervalSince(dockLaunch) < 90 {
+            return true
+        }
+        return false
+    }
+
+    /// Show the launch splash for `bootstrap`. It hides when the bootstrap
+    /// finishes or after `splashMaxDuration`, whichever comes first.
+    private func showLaunchSplash(for bootstrap: LaunchBootstrap) {
         let content = LaunchSplash(bootstrap: bootstrap) { [weak self] in
             self?.hideLaunchSplash()
         }
@@ -166,7 +190,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bringPanelFront(panel)
         splashPanel = panel
 
-        Task { await bootstrap.run() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.splashMaxDuration) { [weak self] in
+            self?.hideLaunchSplash()
+        }
     }
 
     private func hideLaunchSplash() {
@@ -195,7 +221,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "settings":
                 SettingsWindowOpener.open()
             default:
-                ToastOverlay.shared.show("Unknown Type.OH action: \(action)")
+                ToastOverlay.shared.show("Unknown Type.OH action: \(action)", kind: .warning)
             }
         }
     }
@@ -239,6 +265,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 showBannerError("No Whisper model downloaded. Open Settings → Whisper to download one.")
                 return
             }
+            if ModelManager.shared.loadedModelID != modelName {
+                // A cold load can take a while (a minute for large-v3 the first
+                // time); say so instead of looking unresponsive.
+                let display = ModelManager.shared.catalogue.first(where: { $0.id == modelName })?.displayName ?? modelName
+                ToastOverlay.shared.show("Loading the \(display) voice model — recording starts when it's ready.", kind: .info)
+            }
             do {
                 try await whisperService.ensureLoaded(name: modelName, at: folder)
             } catch {
@@ -251,6 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             recordingDestination = destination
             do {
                 try await audioRecorder.start()
+                ToastOverlay.shared.dismiss()
                 showRecordingPanel()
             } catch {
                 showBannerError("Microphone access denied. Enable it in System Settings → Privacy.")
@@ -297,6 +330,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func deliverDictation(_ text: String, to destination: RecordingDestination) {
         switch destination {
+        case .focusedApp where !AXIsProcessTrusted():
+            // Pasting into another app needs Accessibility; keep the text.
+            ToastOverlay.shared.show("Accessibility is off, so the text opened in LazyPad instead of pasting.", kind: .info)
+            openScratchpad(insertingText: text)
         case .focusedApp:
             Task { await pasteService.paste(text) }
         case .scratchpad:
@@ -405,7 +442,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
               captured.isEditable ? 1 : 0)
 
         if captured.text == nil, !AXIsProcessTrusted() {
-            ToastOverlay.shared.show("Grant Accessibility permission, then retry ReType.")
+            ToastOverlay.shared.show("Grant Accessibility permission, then retry ReType.", kind: .warning)
             return
         }
 
@@ -414,7 +451,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // the user can't apply the rewrite anywhere. Route to LazyPad with the
         // text pre-loaded so they can edit & copy/paste manually.
         if let text = captured.text, !text.isEmpty, !captured.isEditable {
-            ToastOverlay.shared.show("Source isn't editable — opened in LazyPad.")
+            ToastOverlay.shared.show("Source isn't editable — opened in LazyPad.", kind: .info)
             openScratchpad(insertingText: text)
             return
         }
@@ -451,8 +488,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let hc = NSHostingController(rootView: content.typeOhAccent())
         hc.sizingOptions = []
         let panel = makePanel(titled: true)
-        panel.title = "ReType • AI Editor"
+        panel.title = "ReType"
         panel.contentViewController = hc
+        panel.touchBar = reTypeTouchBar.makeTouchBar()
         panel.contentMinSize = CGSize(width: 480, height: 340)
         panel.setContentSize(CGSize(width: 600, height: 440))
         if !panel.setFrameUsingName(Self.editorPanelAutosaveName) {
@@ -464,11 +502,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static let editorPanelAutosaveName = "TypeOhReTypeEditorPanel"
+    /// Delegate of the ReType panel's Touch Bar (`NSTouchBar.delegate` is weak).
+    private let reTypeTouchBar = TypeOhTouchBar.reType()
 
     // MARK: - About panel
 
     private func showAboutPanel() {
-        AboutPanelController.shared.show()
+        AboutPanelController.shared.show(settings: settingsStore)
     }
 
     // MARK: - Onboarding
@@ -545,7 +585,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showBannerError(_ message: String) {
         NSLog("[Type.OH] Error: %@", message)
-        ToastOverlay.shared.show(message)
+        ToastOverlay.shared.show(message, kind: .error)
     }
 
     private func applyHotkeys() {

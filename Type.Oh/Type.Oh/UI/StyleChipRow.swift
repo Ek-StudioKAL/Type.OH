@@ -36,6 +36,7 @@ func styleIcon(for preset: StylePreset) -> AppIcon {
     let isSelected: Bool
     let action: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
 
     private var tinted: Bool { isSelected || isHovering }
@@ -57,6 +58,7 @@ func styleIcon(for preset: StylePreset) -> AppIcon {
     private var capsule: some View {
         HStack(spacing: 6) {
             Image(appIcon: styleIcon(for: preset), size: 17, bold: tinted)
+                .accessibilityHidden(true)
             Text(preset.label)
                 .font(.callout.weight(tinted ? .semibold : .regular))
         }
@@ -84,8 +86,10 @@ func styleIcon(for preset: StylePreset) -> AppIcon {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(preset.label) style")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .onHover { isHovering = $0 }
-        .animation(.easeOut(duration: 0.14), value: isSelected)
-        .animation(.easeOut(duration: 0.14), value: isHovering)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isSelected)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: isHovering)
     }
 }

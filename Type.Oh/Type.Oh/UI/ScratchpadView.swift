@@ -69,10 +69,11 @@ private enum ScratchpadAction {
                     translationOptionsRow
                 }
 
-                HStack(spacing: 0) {
+                // Two cards side by side with matching corners and borders —
+                // no divider line between them.
+                HStack(spacing: 10) {
                     if shouldShowSidebar {
                         sidebar
-                        Divider()
                     }
 
                     editorArea
@@ -106,9 +107,15 @@ private enum ScratchpadAction {
             guard let incoming = note.object as? String, !incoming.isEmpty else { return }
             insertDictationResult(incoming)
         }
+        .onReceive(NotificationCenter.default.publisher(for: TypeOhTouchBar.lazyPadAction)) { note in
+            guard let id = note.object as? String else { return }
+            runTouchBarAction(id)
+        }
+        #if DEBUG
         .onReceive(memoryTickTimer) { _ in
             residentMemoryLabel = MemoryReporter.residentDisplayString()
         }
+        #endif
         .onChange(of: settings.sourceLanguage) { newValue in
             sourceLanguage = newValue.map(Locale.Language.init(identifier:))
         }
@@ -141,6 +148,34 @@ private enum ScratchpadAction {
 
     private func runAction(_ action: ScratchpadAction) {
         Task { await performAction(action) }
+    }
+
+    /// Touch Bar buttons (`TypeOhTouchBar.lazyPad`) — same guards as the toolbar.
+    private func runTouchBarAction(_ id: String) {
+        if id == "dictate" {
+            NotificationCenter.default.post(name: NSNotification.Name("typeoh.scratchpad.dictation"), object: nil)
+            return
+        }
+        guard !isProcessing, !text.isEmpty else { return }
+        switch id {
+        case "improve": runAction(.improve)
+        case "fix": runAction(.fix)
+        case "concise": runAction(.concise)
+        case "translate": runAction(.translate)
+        default:
+            guard id.hasPrefix("style:") else { return }
+            let presetID = String(id.dropFirst("style:".count))
+            if let preset = StylePresets.all.first(where: { $0.id == presetID }) {
+                runAction(.style(preset))
+            } else if let custom = settings.customStylePresets.first(where: { $0.id == presetID }) {
+                runAction(.style(StylePreset(
+                    id: custom.id,
+                    label: custom.label,
+                    emoji: custom.emoji,
+                    promptFragment: custom.promptFragment
+                )))
+            }
+        }
     }
 
     private func performAction(_ action: ScratchpadAction) async {
@@ -345,7 +380,7 @@ private enum ScratchpadAction {
         if selectedRange.location != NSNotFound, selectedRange.length > 0 {
             return "Translates the selected \(selectedRange.length) characters."
         }
-        return "Translates the entire scratchpad."
+        return "Translates everything in LazyPad."
     }
 
     private var sidebar: some View {
@@ -361,11 +396,13 @@ private enum ScratchpadAction {
                                 sidebarButton(
                                     title: preset.label,
                                     icon: styleIcon(for: preset),
-                                    isSelected: false
+                                    isSelected: false,
+                                    actionHint: "Apply"
                                 ) {
                                     runAction(.style(preset))
                                 }
                                 .disabled(isProcessing || text.isEmpty)
+                                .help("Rewrite the text (or selection) in the \(preset.label) style")
                             }
                             ForEach(settings.customStylePresets) { preset in
                                 sidebarCustomPresetButton(preset)
@@ -440,15 +477,20 @@ private enum ScratchpadAction {
                     SettingsWindowOpener.open()
                 }
 
-                bottomIconButton(title: "Setup", icon: .improve) {
+                bottomIconButton(title: "Setup", icon: .stepActive) {
                     NotificationCenter.default.post(name: NSNotification.Name("typeoh.showOnboarding"), object: nil)
                 }
+                .help("Re-run the setup wizard")
             }
             .padding(10)
         }
         .frame(width: 220)
         .background(Color.secondary.opacity(0.055))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.secondary.opacity(0.18), lineWidth: 1)
+        )
     }
 
     private var editorArea: some View {
@@ -474,37 +516,44 @@ private enum ScratchpadAction {
             HStack(alignment: .top, spacing: 10) {
                 toolbarButton(
                     title: sidebarIsVisible(for: availableWidth) ? "Hide" : "Show",
-                    icon: sidebarIsVisible(for: availableWidth) ? .hideSidebar : .showSidebar
+                    icon: sidebarIsVisible(for: availableWidth) ? .hideSidebar : .showSidebar,
+                    shortcut: KeyboardShortcut("s", modifiers: [.control, .command])
                 ) {
                     withAnimation(.easeInOut(duration: 0.18)) {
                         isSidebarVisible.toggle()
                     }
                 }
+                .help(sidebarIsVisible(for: availableWidth) ? "Hide sidebar (⌃⌘S)" : "Show sidebar (⌃⌘S)")
+                .accessibilityLabel(sidebarIsVisible(for: availableWidth) ? "Hide sidebar" : "Show sidebar")
 
-                toolbarButton(title: "Dictate", icon: .dictate) {
+                toolbarButton(title: "Dictate", icon: .dictate, shortcut: KeyboardShortcut("d", modifiers: [.shift, .command])) {
                     NotificationCenter.default.post(name: NSNotification.Name("typeoh.scratchpad.dictation"), object: nil)
                 }
+                .help("Dictate into LazyPad (⇧⌘D)")
 
-                toolbarButton(title: "Improve", icon: .improve) {
+                toolbarButton(title: "Improve", icon: .improve, shortcut: KeyboardShortcut("i", modifiers: [.shift, .command])) {
                     runAction(.improve)
                 }
                 .disabled(isProcessing || text.isEmpty)
+                .help("Improve the text or selection (⇧⌘I)")
 
-                toolbarButton(title: "Fix", icon: .fix) {
+                toolbarButton(title: "Fix", icon: .fix, shortcut: KeyboardShortcut("f", modifiers: [.shift, .command])) {
                     runAction(.fix)
                 }
                 .disabled(isProcessing || text.isEmpty)
+                .help("Fix spelling and grammar (⇧⌘F)")
 
-                toolbarButton(title: "Concise", icon: .concise) {
+                toolbarButton(title: "Concise", icon: .concise, shortcut: KeyboardShortcut("c", modifiers: [.shift, .command])) {
                     runAction(.concise)
                 }
                 .disabled(isProcessing || text.isEmpty)
+                .help("Make it more concise (⇧⌘C)")
 
-                toolbarButton(title: "Translate", icon: .translate) {
+                toolbarButton(title: "Translate", icon: .translate, shortcut: KeyboardShortcut("t", modifiers: [.shift, .command])) {
                     runAction(.translate)
                 }
                 .disabled(isProcessing || text.isEmpty)
-                .help(currentLanguagePairLabel + " — change defaults in Settings → Translation")
+                .help(currentLanguagePairLabel + " (⇧⌘T) — change defaults in Settings → Translation")
                 .contextMenu {
                     Text(currentLanguagePairLabel)
                     Divider()
@@ -527,37 +576,39 @@ private enum ScratchpadAction {
                     }
                 }
 
-                toolbarButton(title: "Lang", icon: isTranslationPickerVisible ? .chevronUp : .language) {
+                toolbarButton(title: "Languages", icon: isTranslationPickerVisible ? .chevronUp : .language) {
                     withAnimation(.easeInOut(duration: 0.16)) {
                         isTranslationPickerVisible.toggle()
                     }
                 }
-                .help(currentLanguagePairLabel)
+                .help("Translation languages: " + currentLanguagePairLabel)
 
                 Spacer(minLength: 12)
 
                 // Grouped: the macOS 13 SDK's ViewBuilder takes at most 10 children.
                 Group {
-                toolbarButton(title: "Paste", icon: .pasteToApp) {
+                toolbarButton(title: "Paste", icon: .pasteToApp, shortcut: KeyboardShortcut("v", modifiers: [.shift, .command])) {
                     Task { await pasteToLastApp() }
                 }
                 .disabled(text.isEmpty)
+                .help("Paste into the app you came from (⇧⌘V)")
 
-                toolbarButton(title: "Copy", icon: .copy) {
+                toolbarButton(title: "Copy", icon: .copy, shortcut: KeyboardShortcut("a", modifiers: [.shift, .command])) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(text, forType: .string)
                     setStatus("Copied full text to clipboard.")
                 }
                 .disabled(text.isEmpty)
+                .help("Copy all text (⇧⌘A)")
 
                 toolbarButton(title: "Clear", icon: .clear) {
-                    textViewController.resetText(to: "")
-                    text = ""
+                    textViewController.clearAll()
+                    text = textViewController.currentText ?? ""
                     selectedRange = NSRange(location: 0, length: 0)
-                    store.scheduleSave(text)
-                    setStatus("Scratchpad cleared.")
+                    setStatus("LazyPad cleared — press ⌘Z to undo.")
                 }
                 .disabled(isProcessing || text.isEmpty)
+                .help("Clear all text (⌘Z undoes it)")
                 }
             }
             .frame(minWidth: availableWidth, alignment: .leading)
@@ -592,6 +643,7 @@ private enum ScratchpadAction {
             }
             .buttonStyle(.plain)
             .help("Hide language selection")
+            .accessibilityLabel("Hide language selection")
         }
         .padding(.horizontal, 2)
     }
@@ -641,9 +693,12 @@ private enum ScratchpadAction {
             Text("Whisper: \(whisperModelStatusLabel)")
             Text("•")
             Text("Provider: \(providerStatusLabel)")
+            // Developer readout; release builds leave it out.
+            #if DEBUG
             Text("•")
             Text("Mem: \(residentMemoryLabel)")
                 .help("Resident memory footprint")
+            #endif
         }
         .lineLimit(1)
         .minimumScaleFactor(0.85)
@@ -656,33 +711,17 @@ private enum ScratchpadAction {
     }
 
     @ViewBuilder
-    private func toolbarButton(title: String, icon: AppIcon, action: @escaping () -> Void) -> some View {
+    private func toolbarButton(
+        title: String,
+        icon: AppIcon,
+        shortcut: KeyboardShortcut? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             AccentToolbarLabel(title: title, icon: icon)
         }
         .buttonStyle(.plain)
-    }
-
-    private var currentProviderToolbarTitle: String {
-        switch settings.activeProvider {
-        #if canImport(FoundationModels)
-        case .appleOnDevice: "Apple"
-        #endif
-        case .anthropic: "Claude"
-        case .openAI: "ChatGPT"
-        case .google: "Google"
-        }
-    }
-
-    private func providerMenuTitle(for provider: ProviderID) -> String {
-        switch provider {
-        #if canImport(FoundationModels)
-        case .appleOnDevice: "Apple (On-Device)"
-        #endif
-        case .anthropic: "Anthropic Claude"
-        case .openAI: "OpenAI ChatGPT"
-        case .google: "Google Gemini"
-        }
+        .keyboardShortcut(shortcut)
     }
 
     @ViewBuilder
@@ -726,6 +765,7 @@ private enum ScratchpadAction {
         }
         .buttonStyle(.plain)
         .help("Add a custom preset")
+        .accessibilityLabel("Add a custom preset")
         .disabled(settings.customStylePresets.count >= CustomStylePreset.maxCount)
     }
 
@@ -748,17 +788,19 @@ private enum ScratchpadAction {
             emoji: preset.emoji,
             promptFragment: preset.promptFragment
         )
-        SidebarHoverRow {
+        SidebarHoverRow(actionHint: "Apply") {
             runAction(.style(bridged))
         } content: {
             HStack(spacing: 10) {
                 Text(preset.emoji)
                     .frame(width: 18)
+                    .accessibilityHidden(true)
                 Text(preset.label)
                 Spacer(minLength: 0)
             }
         }
         .disabled(isProcessing || text.isEmpty)
+        .help("Rewrite the text (or selection) with your \(preset.label) preset")
     }
 
     @ViewBuilder
@@ -773,11 +815,18 @@ private enum ScratchpadAction {
     }
 
     @ViewBuilder
-    private func sidebarButton(title: String, icon: AppIcon, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        SidebarHoverRow(isSelected: isSelected, action: action) {
+    private func sidebarButton(
+        title: String,
+        icon: AppIcon,
+        isSelected: Bool,
+        actionHint: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        SidebarHoverRow(isSelected: isSelected, actionHint: actionHint, action: action) {
             HStack(spacing: 10) {
                 Image(appIcon: icon, size: 18, bold: isSelected)
                     .frame(width: 18)
+                    .accessibilityHidden(true)
                 Text(title)
                     .fontWeight(isSelected ? .semibold : .regular)
                 Spacer(minLength: 0)
@@ -795,14 +844,17 @@ private enum ScratchpadAction {
             HStack(spacing: 10) {
                 providerSidebarIcon(for: provider)
                     .frame(width: 18, height: 18)
-                Text(providerMenuTitle(for: provider))
+                    .accessibilityHidden(true)
+                Text(provider.displayName)
                     .fontWeight(isSelected ? .semibold : .regular)
                 Spacer(minLength: 0)
                 if isSelected {
                     Image(appIcon: .selected, size: 14, bold: true)
+                        .accessibilityHidden(true)
                 }
             }
         }
+        .help("Use \(provider.displayName) for rewrites")
     }
 
     @ViewBuilder

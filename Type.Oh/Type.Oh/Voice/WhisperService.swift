@@ -4,6 +4,11 @@ import WhisperKit
 actor WhisperService {
     private var whisperKit: WhisperKit?
     private var loadedModel: String?
+    /// The load in progress, if any. A first Core ML load of a large model
+    /// can take a minute; callers that ask for the same model while it runs
+    /// (launch warm-up, then a dictation) wait on it instead of starting a
+    /// second load.
+    private var inFlightLoad: (id: UUID, name: String, task: Task<Void, Error>)?
 
     /// Snapshot of currently-loaded model name. Nil when nothing is loaded.
     var currentlyLoadedModel: String? { loadedModel }
@@ -11,15 +16,29 @@ actor WhisperService {
     /// Load (or reload) the model from the exact folder URL returned by ModelManager.download().
     func loadModel(name: String, at folderURL: URL) async throws {
         if loadedModel == name, whisperKit != nil { return }
+        if let inFlightLoad, inFlightLoad.name == name {
+            try await inFlightLoad.task.value
+            return
+        }
+
         let config = WhisperKitConfig(
             model: name,
             modelFolder: folderURL.path,
             computeOptions: Self.computeOptions,
             download: false
         )
-        whisperKit = try await WhisperKit(config)
-        loadedModel = name
-        await ModelManager.shared.markLoaded(name)
+        let id = UUID()
+        let task = Task {
+            defer { if self.inFlightLoad?.id == id { self.inFlightLoad = nil } }
+            let kit = try await WhisperKit(config)
+            // `unload()` during the load cancels it; don't install the model.
+            try Task.checkCancellation()
+            self.whisperKit = kit
+            self.loadedModel = name
+            await ModelManager.shared.markLoaded(name)
+        }
+        inFlightLoad = (id, name, task)
+        try await task.value
     }
 
     /// Intel Macs have no Neural Engine, so WhisperKit's Apple Silicon defaults
@@ -50,6 +69,8 @@ actor WhisperService {
     /// Drop the WhisperKit instance. Frees model RAM (200 MB – 3 GB depending on
     /// variant). Next dictation pays a 1-5 s warm-up to reload.
     func unload() async {
+        inFlightLoad?.task.cancel()
+        inFlightLoad = nil
         whisperKit = nil
         loadedModel = nil
         await ModelManager.shared.markUnloaded()

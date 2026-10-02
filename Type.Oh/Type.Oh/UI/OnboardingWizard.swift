@@ -85,7 +85,7 @@ import SwiftUI
                     case .model:             ModelStep(manager: manager)
                     case .keychainNotice:    KeychainNoticeStep()
                     case .provider:          ProviderStep()
-                    case .summary:           SummaryStep(manager: manager)
+                    case .summary:           SummaryStep(manager: manager, goTo: { step = $0 })
                     }
                 }
                 .padding(20)
@@ -109,8 +109,8 @@ import SwiftUI
                     Button(step == .welcome ? "Get Started" : "Next") { goNext() }
                         .buttonStyle(.borderedProminent)
                         .keyboardShortcut(.return)
-                    Button("Skip") { finish() }
-                        .help("Skip onboarding — you can configure everything later in Settings")
+                    Button("Skip Setup") { finish() }
+                        .help("Close the wizard now — you can configure everything later in Settings")
                 }
             }
             .padding(20)
@@ -202,25 +202,27 @@ import SwiftUI
 // MARK: - Step 1: Welcome
 
 @MainActor private struct WelcomeStep: View {
+    @EnvironmentObject private var settings: SettingsStore
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Type.OH gives you two superpowers, anywhere on your Mac:")
+            Text("Type.OH gives you three tools, anywhere on your Mac:")
                 .font(.body)
 
             featureRow(
                 icon: .voiceToText,
-                title: "\(HotkeyConfig.defaultVoice.displayString) — Voice to text",
-                detail: "Hold the hotkey, speak, release. Transcribed locally and pasted at your cursor."
+                title: "\(settings.voiceHotkey.displayString) — Dictate",
+                detail: "Press the hotkey, speak, press it again. Transcribed on this Mac and pasted at your cursor."
             )
             featureRow(
                 icon: .aiEditor,
-                title: "\(HotkeyConfig.defaultEditor.displayString) — AI editor",
-                detail: "Select text in any app, press the hotkey, fix / restyle / translate, then apply."
+                title: "\(settings.editorHotkey.displayString) — ReType",
+                detail: "Select text in any app, press the hotkey, then fix, restyle, or translate it in place."
             )
             featureRow(
                 icon: .lazypad,
-                title: "\(HotkeyConfig.defaultScratchpad.displayString) — LazyPad",
-                detail: "Open your scratchpad workspace for longer edits and reusable style presets."
+                title: "\((settings.scratchpadHotkey ?? .defaultScratchpad).displayString) — LazyPad",
+                detail: "A writing window for longer edits, with your style presets."
             )
 
             Text("This wizard takes about a minute.")
@@ -236,6 +238,7 @@ import SwiftUI
             Image(appIcon: icon, size: 24)
                 .foregroundStyle(.tint)
                 .frame(width: 30)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title).font(.body.weight(.semibold))
                 Text(detail).font(.callout).foregroundStyle(.secondary)
@@ -454,7 +457,7 @@ import SwiftUI
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Choose the shortcuts Type.OH should register globally. Voice and AI Editor are required. LazyPad is optional.")
+            Text("Choose the shortcuts Type.OH should register globally. Dictate and ReType are required. LazyPad is optional.")
                 .fixedSize(horizontal: false, vertical: true)
 
             HotkeyConfigurationEditor(
@@ -582,7 +585,12 @@ import SwiftUI
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Type.OH uses a cloud AI provider for rewrites and translation. Paste an API key for the provider you want — Type.OH stores it in your macOS Keychain.")
+            Text("Pick the AI provider for rewrites. Cloud providers need an API key, which Type.OH keeps in your macOS Keychain.")
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Translation uses Google Translate's free web service by default, so text you translate is sent to Google. You can pick another engine in Settings → Translation.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Picker("Active provider", selection: $settings.activeProvider) {
@@ -671,28 +679,75 @@ import SwiftUI
 @MainActor private struct SummaryStep: View {
     @EnvironmentObject private var settings: SettingsStore
     @ObservedObject var manager: ModelManager
+    /// Jumps back to the wizard step that fixes a missing item.
+    let goTo: (OnboardingWizard.Step) -> Void
+
+    private struct Issue: Identifiable {
+        let id: String
+        let message: String
+        let step: OnboardingWizard.Step
+    }
+
+    /// Anything that will stop a hotkey from working. Read once per render;
+    /// all checks are cheap and none prompts.
+    private var issues: [Issue] {
+        var issues: [Issue] = []
+        if !AXIsProcessTrusted() {
+            issues.append(Issue(id: "ax", message: "Accessibility isn't allowed — ReType can't read selections or paste.", step: .permissions))
+        }
+        if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
+            issues.append(Issue(id: "mic", message: "Microphone access isn't allowed — Dictate can't record.", step: .permissions))
+        }
+        if !manager.isDownloaded(settings.whisperModel) {
+            issues.append(Issue(id: "model", message: "No voice model downloaded — Dictate won't work yet.", step: .model))
+        }
+        let provider = settings.activeProvider
+        if provider.requiresAPIKey && !KeychainStore.hasKey(for: provider) {
+            issues.append(Issue(id: "key", message: "\(provider.displayName) has no API key — rewrites will fail.", step: .provider))
+        }
+        return issues
+    }
 
     var body: some View {
+        let issues = issues
         VStack(alignment: .leading, spacing: 14) {
-            Text("You're set up. Here's a quick recap:")
+            Text(issues.isEmpty ? "You're set up. Here's a quick recap:" : "Almost there — these still need attention:")
                 .font(.body)
+
+            ForEach(issues) { issue in
+                HStack(spacing: 10) {
+                    Image(appIcon: .needsAttention, size: 16)
+                        .foregroundStyle(.orange)
+                        .accessibilityHidden(true)
+                    Text(issue.message)
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button("Fix…") { goTo(issue.step) }
+                        .controlSize(.small)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            }
 
             summaryRow(label: "Voice model", value: voiceModelLabel)
             summaryRow(label: "AI provider", value: settings.activeProvider.displayName)
-            summaryRow(label: "Voice hotkey", value: settings.voiceHotkey.displayString)
-            summaryRow(label: "Editor hotkey", value: settings.editorHotkey.displayString)
+            summaryRow(label: "Translation", value: (settings.translationProvider ?? .preferred).displayName)
+            summaryRow(label: "Dictate hotkey", value: settings.voiceHotkey.displayString)
+            summaryRow(label: "ReType hotkey", value: settings.editorHotkey.displayString)
             summaryRow(label: "LazyPad hotkey", value: settings.scratchpadHotkey?.displayString ?? "Not set")
 
             Divider().padding(.vertical, 6)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text("Next steps").font(.body.weight(.medium))
-                Text("• Press \(settings.voiceHotkey.displayString) anywhere to dictate.")
+                Text("• Press \(settings.voiceHotkey.displayString) to start dictating, and again to paste the text.")
                 Text("• Select text and press \(settings.editorHotkey.displayString) to fix, restyle, or translate it.")
                 if let scratchpadHotkey = settings.scratchpadHotkey {
                     Text("• Press \(scratchpadHotkey.displayString) to open LazyPad.")
                 }
-                Text("• Type.OH lives in your menu bar — click the waveform icon for Settings.")
+                Text("• Type.OH lives in your menu bar — click its icon for Settings.")
             }
             .font(.callout)
             .foregroundStyle(.secondary)

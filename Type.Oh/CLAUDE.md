@@ -9,7 +9,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Type.OH** (also called iLazyKey) is a native macOS menu-bar app with two flows triggered by global hotkeys:
 
 1. **Voice → Text** (`F13`): Record speech → transcribe locally via WhisperKit → paste at cursor.
-2. **AI Editor** (`F14`, LazyPad `F15`; also `typeoh://dictate|retype|lazypad|settings` URLs): Select text in any app → floating panel → Translate / Style / Fix → replace in place.
+2. **ReType** (`F14`, LazyPad `F15`; also `typeoh://dictate|retype|lazypad|settings` URLs): Select text in any app → floating panel → Fix / Improve / Style / Translate → replace in place.
+
+User-facing names are **Dictate**, **ReType**, and **LazyPad** everywhere in the UI (code still uses `voice`, `editor`, `Scratchpad*`).
 
 Everything runs locally by default (WhisperKit on Neural Engine, Apple Foundation Models, Apple Translation). Optionally, users bring their own Anthropic / OpenAI / Google API key stored in the macOS Keychain.
 
@@ -61,9 +63,11 @@ Single app target. Key components by folder:
 
 ### `UI/`
 - `MenuBarContent.swift` — tray menu
-- `RecordingOverlay.swift` — pulsing dot + timer in a non-activating `NSPanel`
-- `AIEditorPanel.swift` — main editor: `ModeTabs` (Translate/Style/Fix) → `StyleChipRow` / `LanguagePicker` / `EmojifyToggle` / `DiffTextView` → Apply/Cancel
-- `DiffTextView.swift` — Fix mode diff (original with strikethrough / result)
+- `RecordingOverlay.swift` — dictation HUD (timer, model + permission badges, Done) in a non-activating `NSPanel`
+- `AIEditorPanel.swift` — ReType: mode toolbar (Fix / Improve / Style / Translate, ⌘1–⌘4) → `StyleChipRow` / `LanguagePicker` → Input / Result cards → Return runs the action, then Insert
+- `ScratchpadView.swift` / `ScratchpadPanel.swift` — LazyPad window (toolbar actions have ⇧⌘ shortcuts)
+- `TypeOhTouchBar.swift` — LazyPad / ReType Touch Bar; buttons post notifications the views handle
+- `ToastOverlay.swift` — transient messages; pass `kind: .info / .warning / .error`
 - `SettingsWindow.swift` — hotkeys, Whisper model download, language, provider + masked key display
 - `AppIcon.swift` — the app's own icon set (`Image(appIcon: .translate, size: 22, bold: isActive)`); see "Icons" below
 
@@ -148,7 +152,7 @@ See `CONTEXT.md §8` for the full done-when list. Performance targets:
 - `CONTEXT.md` — full engineering brief, architecture rationale, locked decisions, and original Action Extension PRD (v2 backlog)
 - `README.md` — user-facing install/usage docs and Whisper model table
 - `docs/careless-whisper-main/` — offline mirror of the Tauri/Rust app that inspired the voice flow UX
-- `docs/telegram_feature_screenshots/` — UX target screenshots for the AI Editor panel
+- `docs/telegram_feature_screenshots/` — UX target screenshots for the ReType panel
 
 ## Remote Agent Notes
 

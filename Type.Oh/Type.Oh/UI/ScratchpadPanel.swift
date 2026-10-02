@@ -4,14 +4,24 @@ import SwiftUI
 final class ScratchpadPanel: NSWindow {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    /// Builds the window's Touch Bar on demand (see `TypeOhTouchBar`).
+    var touchBarProvider: (() -> NSTouchBar?)?
+
+    override func makeTouchBar() -> NSTouchBar? {
+        touchBarProvider?()
+    }
 }
 
 @MainActor
 final class ScratchpadPanelController {
     private static let minimumWindowSize = CGSize(width: 780, height: 240)
     private let panel: ScratchpadPanel
+    private let settingsStore: SettingsStore
+    private var touchBar: TypeOhTouchBar?
 
     init(settingsStore: SettingsStore, pasteService: PasteService, store: ScratchpadStore) {
+        self.settingsStore = settingsStore
         let content = ScratchpadView(pasteService: pasteService, store: store)
             .environmentObject(settingsStore)
 
@@ -40,9 +50,17 @@ final class ScratchpadPanelController {
         // own hit regions; everything else falls through to the window.
         panel.isMovableByWindowBackground = true
         panel.center()
+        panel.touchBarProvider = { [weak self] in
+            guard let self else { return nil }
+            let touchBar = TypeOhTouchBar.lazyPad(customPresets: self.settingsStore.customStylePresets)
+            self.touchBar = touchBar
+            return touchBar.makeTouchBar()
+        }
     }
 
     func show(using settingsStore: SettingsStore, insertingText: String? = nil) {
+        // Rebuilt on demand, so custom presets added since last time show up.
+        panel.touchBar = nil
         NSApp.setActivationPolicy(.regular)
         enforceMinimumWindowSize()
         panel.makeKeyAndOrderFront(nil)

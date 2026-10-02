@@ -44,6 +44,7 @@ enum DictationHUDPhase: Equatable {
     let state: DictationHUDState
     var phase: DictationHUDPhase = .recording
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var elapsed = 0
     @State private var pulsing = false
 
@@ -63,8 +64,14 @@ enum DictationHUDPhase: Equatable {
                     if phase == .processing {
                         badge(icon: .voiceModel, tint: .accentColor, text: "Processing")
                     }
-                    if !state.axTrusted { permissionBadge(label: "AX", icon: .accessibilityMissing) }
-                    if !state.micAuthorized { permissionBadge(label: "Mic", icon: .microphoneBlocked) }
+                    if !state.axTrusted {
+                        permissionBadge(label: "Accessibility off", icon: .accessibilityMissing)
+                            .help("Without Accessibility, the text opens in LazyPad instead of pasting.")
+                    }
+                    if !state.micAuthorized {
+                        permissionBadge(label: "Microphone off", icon: .microphoneBlocked)
+                            .help("Allow Type.OH in System Settings → Privacy & Security → Microphone.")
+                    }
                 }
             }
 
@@ -88,6 +95,9 @@ enum DictationHUDPhase: Equatable {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(minWidth: phase == .processing ? 300 : 260)
+        // Report the content's ideal size, so the panel (sized from
+        // `fittingSize`) grows with the badges instead of clipping them.
+        .fixedSize()
         .background(.black.opacity(0.86), in: RoundedRectangle(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
@@ -95,7 +105,7 @@ enum DictationHUDPhase: Equatable {
         )
         .background(NativeTranslationDriverView())
         .typeOhFocusEffectDisabled()
-        .onAppear { pulsing = true }
+        .onAppear { pulsing = !reduceMotion }
         .onReceive(clock) { _ in elapsed += 1 }
     }
 
@@ -106,9 +116,10 @@ enum DictationHUDPhase: Equatable {
             Circle()
                 .fill(.red)
                 .frame(width: 10, height: 10)
-                .scaleEffect(pulsing ? 1.35 : 0.85)
-                .opacity(pulsing ? 1 : 0.5)
-                .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulsing)
+                .scaleEffect(reduceMotion ? 1 : (pulsing ? 1.35 : 0.85))
+                .opacity(reduceMotion ? 1 : (pulsing ? 1 : 0.5))
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulsing)
+                .accessibilityLabel("Recording")
         case .processing:
             ProgressView()
                 .controlSize(.small)
@@ -133,6 +144,7 @@ enum DictationHUDPhase: Equatable {
         HStack(spacing: 4) {
             Image(appIcon: icon, size: 12, bold: true)
                 .foregroundStyle(tint)
+                .accessibilityHidden(true)
             Text(text)
                 .font(.system(.caption2, design: .rounded))
                 .foregroundStyle(.white.opacity(0.8))
@@ -142,6 +154,7 @@ enum DictationHUDPhase: Equatable {
     private func permissionBadge(label: String, icon: AppIcon) -> some View {
         HStack(spacing: 3) {
             Image(appIcon: icon, size: 12, bold: true)
+                .accessibilityHidden(true)
             Text(label)
                 .font(.system(.caption2, design: .rounded).weight(.semibold))
         }
