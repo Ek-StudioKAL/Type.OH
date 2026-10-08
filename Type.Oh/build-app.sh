@@ -42,6 +42,7 @@ if [[ -n "${TYPEOH_SWIFT_FLAGS:-}" ]]; then read -r -a SWIFT_FLAGS <<< "$TYPEOH_
 echo "==> swift build -c $CONFIG"
 cd "$ROOT"
 "$SWIFT" build -c "$CONFIG" --product Type_Oh ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"}
+"$SWIFT" build -c "$CONFIG" --product TypeOhStrip ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"}
 BIN="$("$SWIFT" build -c "$CONFIG" --show-bin-path)"
 
 # --- bundle ----------------------------------------------------------------
@@ -80,6 +81,29 @@ cp "$M/TypeOh-icons_9Shape - Flat color negative_Artboard 164.png" "$APP/Content
 # App icon set (vector PDFs from tools/build-icons.swift; AppIcon loads them
 # from Contents/Resources — Xcode copies the same folder automatically).
 cp "$SRC"/Icons/icon-*.pdf "$APP/Contents/Resources/"
+
+# Touch Bar Control Strip helper (see Type.Oh/UI/ControlStrip.swift).
+HELPER="$APP/Contents/Helpers/TypeOhStrip.app"
+mkdir -p "$HELPER/Contents/MacOS"
+cp "$BIN/TypeOhStrip" "$HELPER/Contents/MacOS/TypeOhStrip"
+cat > "$HELPER/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>                 <string>TypeOhStrip</string>
+	<key>CFBundleIdentifier</key>                 <string>noob-noob420.Type-Oh.strip</string>
+	<key>CFBundleInfoDictionaryVersion</key>      <string>6.0</string>
+	<key>CFBundleName</key>                       <string>Type.OH Control Strip</string>
+	<key>CFBundlePackageType</key>                <string>APPL</string>
+	<key>CFBundleShortVersionString</key>         <string>1.0</string>
+	<key>CFBundleVersion</key>                    <string>1</string>
+	<key>LSMinimumSystemVersion</key>             <string>13.0</string>
+	<key>LSUIElement</key>                        <true/>
+</dict>
+</plist>
+PLIST
+plutil -lint "$HELPER/Contents/Info.plist" >/dev/null
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

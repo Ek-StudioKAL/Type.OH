@@ -142,6 +142,8 @@ final class SettingsStore: ObservableObject {
     /// so subsequent dictation hotkey presses are instant. Turn off to free ~200 MB-3 GB
     /// while idle, at the cost of a 1-5 s warm-up on next use.
     @Published var whisperKeepLoaded: Bool = true
+    /// The Type.OH button in the Touch Bar's Control Strip (Touch Bar Macs only).
+    @Published var controlStripAction: ControlStripAction = .default
 
     private let fileURL: URL
 
@@ -188,6 +190,7 @@ private extension SettingsStore {
         var customStylePresets: [CustomStylePreset]?
         var translationProvider: TranslationProviderID?
         var whisperKeepLoaded: Bool?
+        var controlStripAction: ControlStripAction?
 
         @MainActor
         init(_ s: SettingsStore) {
@@ -211,6 +214,7 @@ private extension SettingsStore {
             customStylePresets = s.customStylePresets
             translationProvider = s.translationProvider
             whisperKeepLoaded = s.whisperKeepLoaded
+            controlStripAction = s.controlStripAction
         }
 
         @MainActor
@@ -247,6 +251,7 @@ private extension SettingsStore {
                 s.translationProvider = translationProvider
             }
             s.whisperKeepLoaded = whisperKeepLoaded ?? true
+            s.controlStripAction = controlStripAction ?? .default
         }
     }
 }

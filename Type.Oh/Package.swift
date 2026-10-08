@@ -17,6 +17,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .executable(name: "Type_Oh", targets: ["Type_Oh"]),
+        .executable(name: "TypeOhStrip", targets: ["TypeOhStrip"]),
     ],
     dependencies: [
         // Vendored WhisperKit 0.10.1 — the newest release that compiles against
@@ -40,6 +41,12 @@ let package = Package(
                 "Icons", // copied into the app bundle by build-app.sh
             ],
             swiftSettings: macOS13SDK
+        ),
+        // Touch Bar Control Strip button, bundled into Type.Oh.app by
+        // build-app.sh (see ControlStrip.swift for why it's a separate process).
+        .executableTarget(
+            name: "TypeOhStrip",
+            path: "ControlStripHelper"
         ),
         .testTarget(
             name: "Type_OhTests",

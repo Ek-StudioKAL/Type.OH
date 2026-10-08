@@ -229,12 +229,22 @@ final class NativeTextViewController {
 }
 
 /// Text view whose Touch Bar shows the window's actions (LazyPad's
-/// Improve / Fix / …, see `TypeOhTouchBar`) next to the typing suggestions.
-/// The proxy item pulls in the bar of the next responder up the chain.
+/// Improve / Fix / …, ReType's Fix / Improve / …; see `TypeOhTouchBar`)
+/// followed by the typing suggestions in whatever room is left (they're
+/// dropped first when the bar is full). The bar is built here from the window's
+/// `TypeOhTouchBar` because `.otherItemsProxy` doesn't reach it: the SwiftUI
+/// hosting view in between ends the proxy chain.
 @MainActor final class TypeOhTextView: NSTextView {
     override func makeTouchBar() -> NSTouchBar? {
-        let bar = super.makeTouchBar() ?? NSTouchBar()
-        bar.defaultItemIdentifiers = [.otherItemsProxy, .candidateList]
+        guard let actions = window?.touchBar?.delegate as? TypeOhTouchBar else {
+            return super.makeTouchBar()
+        }
+        let bar = actions.makeTouchBar()
+        if let candidates = candidateListTouchBarItem {
+            candidates.visibilityPriority = .low
+            bar.templateItems.insert(candidates)
+            bar.defaultItemIdentifiers.append(candidates.identifier)
+        }
         return bar
     }
 }

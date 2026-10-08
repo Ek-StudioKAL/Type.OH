@@ -53,6 +53,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         applyHotkeys()
+        controlStrip.show(settingsStore.controlStripAction)
+        NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.controlStripChanged"), object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                self.controlStrip.show(self.settingsStore.controlStripAction)
+            }
+        }
 
         NotificationCenter.default.addObserver(forName: NSNotification.Name("typeoh.showAbout"), object: nil, queue: .main) { [weak self] _ in
             guard let self else { return }
@@ -504,6 +511,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let editorPanelAutosaveName = "TypeOhReTypeEditorPanel"
     /// Delegate of the ReType panel's Touch Bar (`NSTouchBar.delegate` is weak).
     private let reTypeTouchBar = TypeOhTouchBar.reType()
+
+    /// The Type.OH button in the Touch Bar's Control Strip; tapping it opens
+    /// `typeoh://<action>` (see the URL scheme above).
+    private let controlStrip = ControlStrip()
+
+    func applicationWillTerminate(_ notification: Notification) {
+        controlStrip.hide()
+    }
 
     // MARK: - About panel
 

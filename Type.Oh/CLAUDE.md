@@ -66,7 +66,8 @@ Single app target. Key components by folder:
 - `RecordingOverlay.swift` — dictation HUD (timer, model + permission badges, Done) in a non-activating `NSPanel`
 - `AIEditorPanel.swift` — ReType: mode toolbar (Fix / Improve / Style / Translate, ⌘1–⌘4) → `StyleChipRow` / `LanguagePicker` → Input / Result cards (draggable divider, split remembered) → Return runs the action, then Insert
 - `ScratchpadView.swift` / `ScratchpadPanel.swift` — LazyPad window (toolbar actions have ⇧⌘ shortcuts)
-- `TypeOhTouchBar.swift` — LazyPad / ReType Touch Bar; buttons post notifications the views handle
+- `TypeOhTouchBar.swift` — LazyPad / ReType Touch Bar; buttons post notifications the views handle. In text fields `TypeOhTextView` builds the bar itself (window actions + typing suggestions at low priority), since `.otherItemsProxy` stops at the SwiftUI hosting view
+- `ControlStrip.swift` — the optional Type.OH button in the Touch Bar's Control Strip (Settings → General → Touch Bar). Hosted by a separate helper, `ControlStripHelper/main.swift` → `Contents/Helpers/TypeOhStrip.app`, launched through Launch Services; it uses private API (`addSystemTrayItem:`, DFRFoundation) and opens `typeoh://<action>` on tap. Only `build-app.sh` bundles the helper; the Xcode build has no button
 - `ToastOverlay.swift` — transient messages; pass `kind: .info / .warning / .error`
 - `SettingsWindow.swift` — hotkeys, Whisper model download, language, provider + masked key display
 - `AppIcon.swift` — the app's own icon set (`Image(appIcon: .translate, size: 22, bold: isActive)`); see "Icons" below

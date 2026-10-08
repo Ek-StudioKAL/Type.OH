@@ -29,7 +29,7 @@ enum SettingsTab: String, Codable, CaseIterable, Sendable {
     /// empty. Longer content scrolls inside the tab's form.
     var preferredHeight: CGFloat {
         switch self {
-        case .general: 570
+        case .general: ControlStrip.hasTouchBar ? 680 : 570 // + the Touch Bar section
         case .providers: 470
         case .presets: 520
         case .translation: 510
@@ -191,6 +191,22 @@ enum SettingsTabRoute {
                         NSApp.setActivationPolicy(show ? .regular : .accessory)
                         settings.save()
                     }
+            }
+            if ControlStrip.hasTouchBar {
+                Section("Touch Bar") {
+                    Picker("Control Strip button", selection: $settings.controlStripAction) {
+                        ForEach(ControlStripAction.allCases, id: \.self) { action in
+                            Text(action.title).tag(action)
+                        }
+                    }
+                    .onChange(of: settings.controlStripAction) { _ in
+                        settings.save()
+                        NotificationCenter.default.post(name: NSNotification.Name("typeoh.controlStripChanged"), object: nil)
+                    }
+                    Text("Shows in the small Control Strip, whatever app is in front. For the other actions, use Quick Actions.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             Section {
                 Button("Re-run Setup Wizard…") {

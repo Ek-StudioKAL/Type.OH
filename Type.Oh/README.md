@@ -55,6 +55,12 @@ URL scheme — `dictate`, `retype`, `lazypad`, `settings` — e.g.
 Quick Actions. While LazyPad or ReType is in front, the Touch Bar also shows
 their actions (Improve, Fix, Concise, Translate, styles; ReType's Insert).
 
+On a MacBook Pro with a Touch Bar, `Settings -> General -> Touch Bar` adds one
+Type.OH button to the small Control Strip (ReType by default; or Dictate,
+LazyPad, None), available whatever app is in front. macOS doesn't list it under
+Customize Control Strip, and it isn't shown in the expanded strip. It needs the
+macOS 13 build (`build-app.sh`), which bundles the helper that hosts it.
+
 You can change or reset these in `Settings -> General`.
 
 ## Translation
