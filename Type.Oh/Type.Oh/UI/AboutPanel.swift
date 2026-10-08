@@ -1,10 +1,14 @@
 import AppKit
 import SwiftUI
 
-final class AboutPanelController {
+/// About Type.OH: the launch splash's card (`LaunchSplash`) with the version,
+/// hotkeys and a Settings button in place of the progress bar. Closes with
+/// Esc, the Close button, or a click outside.
+final class AboutPanelController: NSObject, NSWindowDelegate {
     static let shared = AboutPanelController()
     private var panel: NSPanel?
 
+    @MainActor
     func show(settings: SettingsStore) {
         if let existing = panel {
             bringToFront(existing)
@@ -22,25 +26,30 @@ final class AboutPanelController {
             }
         )
 
-        let hostingView = NSHostingView(rootView: content.typeOhAccent())
-        let p = NSPanel(
-            contentRect: CGRect(origin: .zero, size: hostingView.fittingSize),
-            styleMask: [.titled, .closable, .nonactivatingPanel],
+        let hc = NSHostingController(rootView: content.typeOhAccent())
+        hc.sizingOptions = .preferredContentSize
+        let p = AboutWindow(
+            contentRect: CGRect(origin: .zero, size: hc.view.fittingSize),
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
-        p.title = "About Type.OH"
-        p.contentView = hostingView
+        p.contentViewController = hc
+        p.setContentSize(hc.view.fittingSize)
+        p.backgroundColor = .clear
+        p.isOpaque = false
         p.isFloatingPanel = true
         p.level = .floating
         p.hasShadow = true
         p.isMovableByWindowBackground = true
+        p.delegate = self
         p.center()
 
         bringToFront(p)
         panel = p
     }
 
+    @MainActor
     private func bringToFront(_ p: NSPanel) {
         // Restore whichever activation policy was in effect before we temporarily go .regular.
         let prior = NSApp.activationPolicy()
@@ -53,9 +62,19 @@ final class AboutPanelController {
     }
 
     func close() {
-        panel?.close()
+        let p = panel
         panel = nil
+        p?.close()
     }
+
+    func windowDidResignKey(_ notification: Notification) {
+        close()
+    }
+}
+
+/// Borderless panels can't become key by default; this one needs to, for Esc.
+private final class AboutWindow: NSPanel {
+    override var canBecomeKey: Bool { true }
 }
 
 @MainActor private struct AboutPanelContent: View {
@@ -64,54 +83,80 @@ final class AboutPanelController {
     let onClose: () -> Void
 
     private var version: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String
+        return build.map { "Version \(short) (\($0))" } ?? "Version \(short)"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Type.OH")
-                        .font(.largeTitle.bold())
-                    Text("Version \(version)")
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
+        VStack(spacing: 22) {
+            logo
+
+            VStack(spacing: 4) {
+                Text("Type.OH")
+                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                    .foregroundStyle(.primary)
+                Text("Voice + AI for everywhere you type")
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(.secondary)
+                Text(version)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 2)
             }
 
-            Divider()
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Hotkeys")
-                    .font(.headline)
-                hotkeyRow(settings.voiceHotkey.displayString, label: "Dictate")
-                hotkeyRow(settings.editorHotkey.displayString, label: "ReType")
-                hotkeyRow(settings.scratchpadHotkey?.displayString ?? "—", label: "LazyPad")
+            HStack(spacing: 14) {
+                hotkey(settings.voiceHotkey.displayString, label: "Dictate")
+                hotkey(settings.editorHotkey.displayString, label: "ReType")
+                hotkey(settings.scratchpadHotkey?.displayString ?? "—", label: "LazyPad")
             }
 
-            Divider()
-
-            HStack {
+            HStack(spacing: 10) {
                 Button("Settings…") { onOpenSettings() }
-                    .buttonStyle(.bordered)
-                Spacer()
                 Button("Close") { onClose() }
-                    .buttonStyle(.bordered)
                     .keyboardShortcut(.escape)
             }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
         }
-        .padding(24)
-        .frame(width: 320)
+        .padding(36)
+        .frame(width: 360)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.regularMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(Color.white.opacity(0.08), lineWidth: 0.5)
+        )
+        .typeOhFocusEffectDisabled()
     }
 
-    @ViewBuilder
-    private func hotkeyRow(_ keys: String, label: String) -> some View {
-        HStack(spacing: 8) {
+    private var logo: some View {
+        Group {
+            if let icon = NSImage(named: NSImage.applicationIconName) {
+                Image(nsImage: icon)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                Image(appIcon: .voiceModel, size: 96)
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .frame(width: 96, height: 96)
+        .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
+    }
+
+    private func hotkey(_ keys: String, label: String) -> some View {
+        VStack(spacing: 5) {
             Text(keys)
-                .font(.system(.body, design: .monospaced))
+                .font(.system(.callout, design: .rounded).weight(.medium))
                 .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Color.secondary.opacity(0.13), in: RoundedRectangle(cornerRadius: 4))
+                .background(Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 5))
             Text(label)
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(.secondary)
         }
     }
 }

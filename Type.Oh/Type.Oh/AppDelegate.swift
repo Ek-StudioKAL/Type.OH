@@ -497,7 +497,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let panel = makePanel(titled: true)
         panel.title = "ReType"
         panel.contentViewController = hc
-        panel.touchBar = reTypeTouchBar.makeTouchBar()
+        // Rebuilt per panel, so custom presets added since show up.
+        let touchBar = TypeOhTouchBar.reType(settings: settingsStore)
+        reTypeTouchBar = touchBar
+        panel.touchBar = touchBar.makeTouchBar()
         panel.contentMinSize = CGSize(width: 480, height: 340)
         panel.setContentSize(CGSize(width: 600, height: 440))
         if !panel.setFrameUsingName(Self.editorPanelAutosaveName) {
@@ -510,7 +513,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private static let editorPanelAutosaveName = "TypeOhReTypeEditorPanel"
     /// Delegate of the ReType panel's Touch Bar (`NSTouchBar.delegate` is weak).
-    private let reTypeTouchBar = TypeOhTouchBar.reType()
+    private var reTypeTouchBar: TypeOhTouchBar?
 
     /// The Type.OH button in the Touch Bar's Control Strip; tapping it opens
     /// `typeoh://<action>` (see the URL scheme above).

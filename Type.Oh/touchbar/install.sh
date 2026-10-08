@@ -9,6 +9,11 @@
 #
 # Each action just runs:  open -g "typeoh://<action>"
 # `-g` keeps your current app in front so dictation pastes into it.
+#
+# The Touch Bar shows each action's menu name ("Dictate", not "Type.OH
+# Dictate") and icon. Quick Actions can only use Apple's NSTouchBar*Template
+# icons: icon files in the workflow are ignored, and services declared by an
+# app don't appear on the Touch Bar at all.
 set -euo pipefail
 
 DEST="$HOME/Library/Services"
@@ -37,7 +42,7 @@ make_workflow() {   # name  url-action  touch-bar-icon
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>Type.OH $name</string>
+				<string>$name</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
@@ -269,10 +274,25 @@ PLIST
 }
 
 make_workflow "Dictate" "dictate" "NSTouchBarAudioInputTemplate"
-make_workflow "ReType"  "retype"  "NSTouchBarComposeTemplate"
-make_workflow "LazyPad" "lazypad" "NSTouchBarTextListTemplate"
+make_workflow "ReType"  "retype"  "NSTouchBarTextBoxTemplate"
+make_workflow "LazyPad" "lazypad" "NSTouchBarComposeTemplate"
+
+# Show them on the Touch Bar. macOS keeps that switch per menu name
+# (pbs NSServicesStatus "(null) - <name> - runWorkflowAsService"), so a
+# renamed action starts hidden. Drop the entries for the old "Type.OH <name>"
+# names too.
+status=$(mktemp)
+defaults export pbs "$status"
+for name in Dictate ReType LazyPad; do
+    plutil -replace "NSServicesStatus.(null) - $name - runWorkflowAsService" -json \
+        '{"presentation_modes":{"ContextMenu":true,"ServicesMenu":true,"TouchBar":true}}' "$status"
+    plutil -remove "NSServicesStatus.(null) - Type\.OH $name - runWorkflowAsService" "$status" 2>/dev/null || true
+done
+defaults import pbs "$status"
+rm -f "$status"
 
 # Refresh the Services registry so the Touch Bar / Services menu see them now.
+/System/Library/CoreServices/pbs -flush 2>/dev/null || true
 /System/Library/CoreServices/pbs -update 2>/dev/null || true
 
 if [[ "${1:-}" == "--strip" ]]; then

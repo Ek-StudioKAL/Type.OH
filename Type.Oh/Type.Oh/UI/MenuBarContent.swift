@@ -21,6 +21,10 @@ import SwiftUI
 
         Divider()
 
+        Button("About Type.OH") {
+            NotificationCenter.default.post(name: NSNotification.Name("typeoh.showAbout"), object: nil)
+        }
+
         Button("Quit Type.OH") { NSApp.terminate(nil) }
     }
 }

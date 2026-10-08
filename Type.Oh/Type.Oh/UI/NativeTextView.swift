@@ -229,23 +229,40 @@ final class NativeTextViewController {
 }
 
 /// Text view whose Touch Bar shows the window's actions (LazyPad's
-/// Improve / Fix / …, ReType's Fix / Improve / …; see `TypeOhTouchBar`)
-/// followed by the typing suggestions in whatever room is left (they're
-/// dropped first when the bar is full). The bar is built here from the window's
-/// `TypeOhTouchBar` because `.otherItemsProxy` doesn't reach it: the SwiftUI
-/// hosting view in between ends the proxy chain.
+/// Dictate / Improve / … and styles, ReType's Fix / Improve / …; see
+/// `TypeOhTouchBar`), in LazyPad followed by Apple's typing suggestions,
+/// which fold with their ‹ › chevron like TextEdit's. The bar is built here because
+/// `.otherItemsProxy` doesn't reach the window's bar: the SwiftUI hosting
+/// view in between ends the proxy chain.
 @MainActor final class TypeOhTextView: NSTextView {
+    /// Kept here because `NSTouchBar.delegate` is weak and LazyPad replaces
+    /// its `TypeOhTouchBar` each time it opens; a released one would leave
+    /// the bar's lazily made items blank.
+    private var actions: TypeOhTouchBar?
+
+    /// Rebuilt on each focus: the window's `TypeOhTouchBar` is replaced when
+    /// it reopens (new custom presets).
+    override func becomeFirstResponder() -> Bool {
+        touchBar = nil
+        return super.becomeFirstResponder()
+    }
+
     override func makeTouchBar() -> NSTouchBar? {
         guard let actions = window?.touchBar?.delegate as? TypeOhTouchBar else {
             return super.makeTouchBar()
         }
-        let bar = actions.makeTouchBar()
-        if let candidates = candidateListTouchBarItem {
-            candidates.visibilityPriority = .low
-            bar.templateItems.insert(candidates)
-            bar.defaultItemIdentifiers.append(candidates.identifier)
-        }
+        self.actions = actions
+        let bar = NSTouchBar()
+        // The text view's own delegate method makes the candidate list
+        // (`candidateListTouchBarItem` stays nil until something asks it to).
+        bar.delegate = self
+        bar.defaultItemIdentifiers = actions.itemIdentifiers + (actions.showsSuggestions ? [.candidateList] : [])
         return bar
+    }
+
+    override func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
+        actions?.touchBar(touchBar, makeItemForIdentifier: identifier)
+            ?? super.touchBar(touchBar, makeItemForIdentifier: identifier)
     }
 }
 

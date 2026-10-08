@@ -19,6 +19,15 @@ struct TypeOhApp: App {
                 .typeOhAccent()
                 .typeOhFocusEffectDisabled()
         }
+        .commands {
+            // The app menu's About (shown with "Show in Dock") opens Type.OH's
+            // own About card instead of the standard panel.
+            CommandGroup(replacing: .appInfo) {
+                Button("About Type.OH") {
+                    NotificationCenter.default.post(name: NSNotification.Name("typeoh.showAbout"), object: nil)
+                }
+            }
+        }
     }
 }
 

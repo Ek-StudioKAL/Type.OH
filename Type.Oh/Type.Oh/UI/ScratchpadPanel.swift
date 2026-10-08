@@ -52,7 +52,7 @@ final class ScratchpadPanelController {
         panel.center()
         panel.touchBarProvider = { [weak self] in
             guard let self else { return nil }
-            let touchBar = TypeOhTouchBar.lazyPad(customPresets: self.settingsStore.customStylePresets)
+            let touchBar = TypeOhTouchBar.lazyPad(settings: self.settingsStore)
             self.touchBar = touchBar
             return touchBar.makeTouchBar()
         }

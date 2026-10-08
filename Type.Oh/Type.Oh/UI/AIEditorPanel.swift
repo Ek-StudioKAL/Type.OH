@@ -364,7 +364,18 @@ enum EditorMode: String, CaseIterable {
         case "fix": newMode = .fix
         case "improve": newMode = .improve
         case "translate": newMode = .translate
-        default: return
+        default:
+            guard id.hasPrefix("style:") else { return }
+            let presetID = String(id.dropFirst("style:".count))
+            if let preset = StylePresets.all.first(where: { $0.id == presetID }) {
+                selectedStyle = preset
+            } else if let custom = settings.customStylePresets.first(where: { $0.id == presetID }) {
+                selectedStyle = StylePreset(id: custom.id, label: custom.label,
+                                            emoji: custom.emoji, promptFragment: custom.promptFragment)
+            } else {
+                return
+            }
+            newMode = .style
         }
         guard !isProcessing, !editableInput.isEmpty else { return }
         setMode(newMode)
