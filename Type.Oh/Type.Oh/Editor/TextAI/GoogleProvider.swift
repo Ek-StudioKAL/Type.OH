@@ -20,10 +20,12 @@ struct GoogleProvider: TextAIProvider {
     private func complete(_ prompt: String) async throws -> String {
         guard !apiKey.isEmpty else { throw ProviderError.missingAPIKey }
 
-        let urlStr = "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)"
+        let urlStr = "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent"
         var req = URLRequest(url: URL(string: urlStr)!)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Header, not `?key=`: URLs end up in logs, proxies and error userInfo.
+        req.setValue(apiKey,             forHTTPHeaderField: "x-goog-api-key")
         req.httpBody = try JSONSerialization.data(withJSONObject: [
             "contents": [["parts": [["text": prompt]]]]
         ])
