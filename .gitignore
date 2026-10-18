@@ -1,10 +1,44 @@
-/docs
+# Public repo: only what's needed to build, test and document Type.OH.
+
+# macOS
 .DS_Store
+
+# Xcode build output and per-user state
+build/
+DerivedData/
+xcuserdata/
+*.xcscmblueprint
 
 # SwiftPM build output (macOS 13 / Intel build, see Type.Oh/build-app.sh)
 .build/
-Type.Oh/build/ventura/
+.swiftpm/
 
-# Icon design workspace (reference sheets render Apple SF Symbols; the
-# shipped icon sources live in Type.Oh/icons/svg)
-icon-redesign/
+# Release builds go to GitHub Releases, not git
+Release/
+*.app/
+*.zip
+*.dmg
+*.xcarchive
+*.dSYM/
+
+# Secrets and signing material
+.env
+.env.*
+*.p12
+*.pem
+*.cer
+*.mobileprovision
+*.provisionprofile
+
+# Local Claude Code state (CLAUDE.md, TODO.md and .claude/routines stay
+# public: the cloud auto-dev routine reads them)
+.claude/settings.local.json
+.claude/worktrees/
+
+# Local working material
+/docs/
+/icon-redesign/
+/Splash_screen-ref/
+/screenshots-*/
+/CONTEXT.md
+/Type.Oh/docs/
